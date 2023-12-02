@@ -12,7 +12,7 @@ from torch.utils.data import DataLoader, Dataset, IterableDataset
 
 from threestudio import register
 from threestudio.utils.base import Updateable
-from threestudio.data.uncond import (
+from .uncond import (
     RandomCameraDataModuleConfig,
     RandomCameraDataset,
     RandomCameraIterableDataset,
