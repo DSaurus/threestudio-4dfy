@@ -214,18 +214,6 @@ class BaseLift3DSystem(BaseSystem):
         prompt_processor_type_image: str = ""
         prompt_processor_image: dict = field(default_factory=dict)
 
-        guidance_type_multi_view: str = ""
-        guidance_multi_view: dict = field(default_factory=dict)
-
-        prompt_processor_type_multi_view: str = ""
-        prompt_processor_multi_view: dict = field(default_factory=dict)
-
-        guidance_type_video: str = ""
-        guidance_video: dict = field(default_factory=dict)
-
-        prompt_processor_type_video: str = ""
-        prompt_processor_video: dict = field(default_factory=dict)
-
         # geometry export configurations, no need to specify in training
         exporter_type: str = "mesh-exporter"
         exporter: dict = field(default_factory=dict)

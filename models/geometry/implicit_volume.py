@@ -11,7 +11,7 @@ from threestudio.models.geometry.base import (
     BaseImplicitGeometry,
     contract_to_unisphere,
 )
-from threestudio.models.networks import get_encoding, get_mlp
+from ..networks import get_encoding, get_mlp
 from threestudio.utils.ops import get_activation
 from threestudio.utils.typing import *
 

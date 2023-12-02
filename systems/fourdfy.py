@@ -1,5 +1,5 @@
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import torch
 import numpy as np
@@ -15,6 +15,19 @@ class Fourdfy(BaseLift3DSystem):
     @dataclass
     class Config(BaseLift3DSystem.Config):
         stage: str = "coarse"
+
+        guidance_type_multi_view: str = ""
+        guidance_multi_view: dict = field(default_factory=dict)
+
+        prompt_processor_type_multi_view: str = ""
+        prompt_processor_multi_view: dict = field(default_factory=dict)
+
+        guidance_type_video: str = ""
+        guidance_video: dict = field(default_factory=dict)
+
+        prompt_processor_type_video: str = ""
+        prompt_processor_video: dict = field(default_factory=dict)
+
         visualize_samples: bool = False
         prob_multi_view: Optional[float] = None
         prob_single_view_video: Optional[float] = None

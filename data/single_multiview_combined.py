@@ -11,12 +11,12 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader, Dataset, IterableDataset
 
 from threestudio import register
-from threestudio.data.uncond import (
+from .uncond import (
     RandomCameraDataModuleConfig,
     RandomCameraDataset,
     RandomCameraIterableDataset,
 )
-from threestudio.data.random_multiview import (
+from .random_multiview import (
     RandomMultiviewCameraDataModuleConfig,
     RandomMultiviewCameraIterableDataset
 )
