@@ -11,8 +11,6 @@ import pytorch_lightning as pl
 import torch
 import torchvision.transforms.functional as TF
 from PIL import Image
-from torch.utils.data import DataLoader, Dataset, IterableDataset
-
 from threestudio import register
 from threestudio.data.uncond import (
     RandomCameraDataModuleConfig,
@@ -28,6 +26,7 @@ from threestudio.utils.ops import (
     get_rays,
 )
 from threestudio.utils.typing import *
+from torch.utils.data import DataLoader, Dataset, IterableDataset
 
 
 def _load_16big_png_depth(depth_png) -> np.ndarray:

@@ -4,18 +4,17 @@ from dataclasses import dataclass, field
 
 import cv2
 import numpy as np
+import threestudio
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from diffusers import DDIMScheduler, DDPMScheduler, StableDiffusionPipeline
 from diffusers.utils.import_utils import is_xformers_available
 from omegaconf import OmegaConf
-from tqdm import tqdm
-
-import threestudio
 from threestudio.utils.base import BaseObject
 from threestudio.utils.misc import C, parse_version
 from threestudio.utils.typing import *
+from tqdm import tqdm
 
 
 def get_obj_from_str(string, reload=False):
@@ -141,8 +140,12 @@ class Zero123Guidance(BaseObject):
 
     @torch.cuda.amp.autocast(enabled=False)
     def set_min_max_steps(self, min_step_percent=0.02, max_step_percent=0.98):
-        self.min_step = int(self.scheduler.config.num_train_timesteps * min_step_percent)
-        self.max_step = int(self.scheduler.config.num_train_timesteps * max_step_percent)
+        self.min_step = int(
+            self.scheduler.config.num_train_timesteps * min_step_percent
+        )
+        self.max_step = int(
+            self.scheduler.config.num_train_timesteps * max_step_percent
+        )
 
     @torch.cuda.amp.autocast(enabled=False)
     def prepare_embeddings(self, image_path: str) -> Float[Tensor, "B 3 256 256"]:

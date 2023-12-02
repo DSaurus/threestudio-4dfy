@@ -1,13 +1,13 @@
 import os
 from dataclasses import dataclass, field
 
-import torch
 import numpy as np
-
 import threestudio
-from threestudio.systems.base import BaseLift3DSystem
+import torch
 from threestudio.utils.ops import binary_cross_entropy, dot
 from threestudio.utils.typing import *
+
+from .base import BaseLift3DSystem
 
 
 @threestudio.register("fourdfy-system")
@@ -28,10 +28,15 @@ class Fourdfy(BaseLift3DSystem):
         prompt_processor_type_video: str = ""
         prompt_processor_video: dict = field(default_factory=dict)
 
+        simultan: bool = False
+
         visualize_samples: bool = False
         prob_multi_view: Optional[float] = None
         prob_single_view_video: Optional[float] = None
-        eval_depth_range_perc: Tuple[float, float] = (10, 99) # Adjust manually based on object, near far depth bounds percentage in (0, 100)
+        eval_depth_range_perc: Tuple[float, float] = (
+            10,
+            99,
+        )  # Adjust manually based on object, near far depth bounds percentage in (0, 100)
 
     cfg: Config
 
@@ -41,38 +46,50 @@ class Fourdfy(BaseLift3DSystem):
         self.simultan = self.cfg.get("simultan", False)
         self.static = self.cfg.geometry.pos_encoding_config.get("static", True)
         self.prob_multi_view = self.cfg.get("prob_multi_view", None)
-        self.single_view_img = self.cfg.prob_single_view_video not in [1.0, None] or self.static
+        self.single_view_img = (
+            self.cfg.prob_single_view_video not in [1.0, None] or self.static
+        )
         self.guidance = None
         self.prompt_processor = None
         self.prompt_utils = None
         self.geometry_encoding = self.geometry.encoding.encoding
         if self.prob_multi_view not in [0.0, None]:
-            self.cfg.prompt_processor_multi_view["prompt"] = self.cfg.prompt_processor["prompt"]
-            self.guidance_multi_view = threestudio.find(self.cfg.guidance_type_multi_view)(self.cfg.guidance_multi_view)
-            self.prompt_processor_multi_view = threestudio.find(self.cfg.prompt_processor_type_multi_view)(
-                self.cfg.prompt_processor_multi_view
-            )
+            self.cfg.prompt_processor_multi_view["prompt"] = self.cfg.prompt_processor[
+                "prompt"
+            ]
+            self.guidance_multi_view = threestudio.find(
+                self.cfg.guidance_type_multi_view
+            )(self.cfg.guidance_multi_view)
+            self.prompt_processor_multi_view = threestudio.find(
+                self.cfg.prompt_processor_type_multi_view
+            )(self.cfg.prompt_processor_multi_view)
             self.prompt_utils_multi_view = self.prompt_processor_multi_view()
 
             self.guidance = self.guidance_multi_view
             self.prompt_processor = self.prompt_processor_multi_view
             self.prompt_utils = self.prompt_utils_multi_view
         if not self.static:
-            self.cfg.prompt_processor_video["prompt"] = self.cfg.prompt_processor["prompt"]
-            self.guidance_video = threestudio.find(self.cfg.guidance_type_video)(self.cfg.guidance_video)
-            self.prompt_processor_video = threestudio.find(self.cfg.prompt_processor_type_video)(
-                self.cfg.prompt_processor_video
+            self.cfg.prompt_processor_video["prompt"] = self.cfg.prompt_processor[
+                "prompt"
+            ]
+            self.guidance_video = threestudio.find(self.cfg.guidance_type_video)(
+                self.cfg.guidance_video
             )
+            self.prompt_processor_video = threestudio.find(
+                self.cfg.prompt_processor_type_video
+            )(self.cfg.prompt_processor_video)
             self.prompt_utils_video = self.prompt_processor_video()
             if self.guidance is None:
                 self.guidance = self.guidance_video
                 self.prompt_processor = self.prompt_processor_video
                 self.prompt_utils = self.prompt_utils_video
         if self.single_view_img:
-            self.guidance_single_view = threestudio.find(self.cfg.guidance_type)(self.cfg.guidance)
-            self.prompt_processor_single = threestudio.find(self.cfg.prompt_processor_type)(
-                self.cfg.prompt_processor
+            self.guidance_single_view = threestudio.find(self.cfg.guidance_type)(
+                self.cfg.guidance
             )
+            self.prompt_processor_single = threestudio.find(
+                self.cfg.prompt_processor_type
+            )(self.cfg.prompt_processor)
             self.prompt_utils_single_view = self.prompt_processor_single()
             if self.guidance is None:
                 self.guidance = self.guidance_single_view
@@ -89,7 +106,7 @@ class Fourdfy(BaseLift3DSystem):
                 batch["frame_times"] = batch["frame_times"].flatten()
                 for frame_idx, frame_time in enumerate(batch["frame_times"].tolist()):
                     self.geometry_encoding.frame_time = frame_time
-                    if batch['train_dynamic_camera']:
+                    if batch["train_dynamic_camera"]:
                         batch_frame = {}
                         for k_frame, v_frame in batch.items():
                             if isinstance(v_frame, torch.Tensor):
@@ -106,7 +123,9 @@ class Fourdfy(BaseLift3DSystem):
                     render_outs.append(render_out)
                 out = {}
                 for k in render_out:
-                    out[k] = torch.cat([render_out_i[k] for render_out_i in render_outs])
+                    out[k] = torch.cat(
+                        [render_out_i[k] for render_out_i in render_outs]
+                    )
             else:
                 out = self.renderer(**batch)
         return out
@@ -116,33 +135,35 @@ class Fourdfy(BaseLift3DSystem):
 
     def training_step(self, batch, batch_idx):
         is_video = batch["is_video"]
-        batch_size = batch['c2w'].shape[0]
-        if batch['train_dynamic_camera']:
-            batch_size = batch_size // batch['frame_times'].shape[0]
-        if is_video: 
+        batch_size = batch["c2w"].shape[0]
+        if batch["train_dynamic_camera"]:
+            batch_size = batch_size // batch["frame_times"].shape[0]
+        if is_video:
             guidance = self.guidance_video
             prompt_utils = self.prompt_utils_video
             static = self.static
             self.geometry_encoding.is_video = True
             self.geometry_encoding.set_temp_param_grad(True)
         else:
-            if batch['single_view']:
+            if batch["single_view"]:
                 guidance = self.guidance_single_view
                 prompt_utils = self.prompt_utils_single_view
             else:
                 guidance = self.guidance_multi_view
                 prompt_utils = self.prompt_utils_multi_view
             static = True
-            num_static_frames = 1 # Use a single random time for static guidance
-            batch["frame_times"] = batch["frame_times"][torch.randperm(batch["frame_times"].shape[0])][:num_static_frames]
+            num_static_frames = 1  # Use a single random time for static guidance
+            batch["frame_times"] = batch["frame_times"][
+                torch.randperm(batch["frame_times"].shape[0])
+            ][:num_static_frames]
             self.geometry_encoding.is_video = False
             self.geometry_encoding.set_temp_param_grad(False)
         out = self(batch)
         if not self.static:
             if static:
-                batch['num_frames'] = num_static_frames
+                batch["num_frames"] = num_static_frames
             else:
-                batch['num_frames'] = self.cfg.geometry.pos_encoding_config.num_frames 
+                batch["num_frames"] = self.cfg.geometry.pos_encoding_config.num_frames
 
         if self.cfg.stage == "geometry":
             guidance_inp = out["comp_normal"]
@@ -152,8 +173,15 @@ class Fourdfy(BaseLift3DSystem):
         else:
             guidance_inp = out["comp_rgb"]
             if static:
-                guidance_out_list = [guidance(guidance_inp_i, prompt_utils, **batch, rgb_as_latents=False) for guidance_inp_i in guidance_inp.split(batch_size)]
-                guidance_out = {k: torch.zeros_like(v) for k, v in guidance_out_list[0].items()}
+                guidance_out_list = [
+                    guidance(
+                        guidance_inp_i, prompt_utils, **batch, rgb_as_latents=False
+                    )
+                    for guidance_inp_i in guidance_inp.split(batch_size)
+                ]
+                guidance_out = {
+                    k: torch.zeros_like(v) for k, v in guidance_out_list[0].items()
+                }
                 for guidance_out_i in guidance_out_list:
                     for k, v in guidance_out.items():
                         guidance_out[k] = v + guidance_out_i[k]
@@ -266,40 +294,40 @@ class Fourdfy(BaseLift3DSystem):
             batch_video["frame_times"] = batch["frame_times_video"]
             out_video = self(batch_video)
             self.save_image_grid(
-            f"it{self.true_global_step}-{batch['index'][0]}_video.png",
-            (
-                [
+                f"it{self.true_global_step}-{batch['index'][0]}_video.png",
+                (
+                    [
+                        {
+                            "type": "rgb",
+                            "img": out_video["comp_rgb"],
+                            "kwargs": {"data_format": "HWC"},
+                        },
+                    ]
+                    if "comp_rgb" in out_video
+                    else []
+                )
+                + (
+                    [
+                        {
+                            "type": "rgb",
+                            "img": out_video["comp_normal"],
+                            "kwargs": {"data_format": "HWC", "data_range": (0, 1)},
+                        }
+                    ]
+                    if "comp_normal" in out_video
+                    else []
+                )
+                + [
                     {
-                        "type": "rgb",
-                        "img": out_video["comp_rgb"],
-                        "kwargs": {"data_format": "HWC"},
+                        "type": "grayscale",
+                        "img": out_video["opacity"],
+                        "kwargs": {"cmap": None, "data_range": (0, 1)},
                     },
-                ]
-                if "comp_rgb" in out_video
-                else []
+                ],
+                name="validation_step",
+                step=self.true_global_step,
+                video=True,
             )
-            + (
-                [
-                    {
-                        "type": "rgb",
-                        "img": out_video["comp_normal"],
-                        "kwargs": {"data_format": "HWC", "data_range": (0, 1)},
-                    }
-                ]
-                if "comp_normal" in out_video
-                else []
-            )
-            + [
-                {
-                    "type": "grayscale",
-                    "img": out_video["opacity"],
-                    "kwargs": {"cmap": None, "data_range": (0, 1)},
-                },
-            ],
-            name="validation_step",
-            step=self.true_global_step,
-            video=True
-        )
 
         if self.cfg.visualize_samples:
             self.save_image_grid(
@@ -308,13 +336,17 @@ class Fourdfy(BaseLift3DSystem):
                     {
                         "type": "rgb",
                         "img": self.guidance_single_view.sample(
-                            self.prompt_utils_single_view, **batch, seed=self.global_step
+                            self.prompt_utils_single_view,
+                            **batch,
+                            seed=self.global_step,
                         )[0],
                         "kwargs": {"data_format": "HWC"},
                     },
                     {
                         "type": "rgb",
-                        "img": self.guidance_single_view.sample_lora(self.prompt_utils_single_view, **batch)[0],
+                        "img": self.guidance_single_view.sample_lora(
+                            self.prompt_utils_single_view, **batch
+                        )[0],
                         "kwargs": {"data_format": "HWC"},
                     },
                 ],
@@ -378,7 +410,7 @@ class Fourdfy(BaseLift3DSystem):
                         ]
                     ),
                     name="test_step",
-                    step=self.true_global_step
+                    step=self.true_global_step,
                 )
             if "comp_normal" in out:
                 self.save_image_grid(
@@ -393,7 +425,7 @@ class Fourdfy(BaseLift3DSystem):
                         ]
                     ),
                     name="test_step",
-                    step=self.true_global_step
+                    step=self.true_global_step,
                 )
 
     def on_test_epoch_end(self):
@@ -409,19 +441,23 @@ class Fourdfy(BaseLift3DSystem):
         )
         if not self.static:
             self.save_img_sequence(
-                    f"it{self.true_global_step}-test_static",
-                    f"it{self.true_global_step}-test_static",
-                    "(\d+)\.png",
-                    save_format="mp4",
-                    fps=fps,
-                    name=f"test_static",
-                    step=self.true_global_step,
-                )
+                f"it{self.true_global_step}-test_static",
+                f"it{self.true_global_step}-test_static",
+                "(\d+)\.png",
+                save_format="mp4",
+                fps=fps,
+                name=f"test_static",
+                step=self.true_global_step,
+            )
         out_depths = np.stack(self.out_depths)
         non_zeros_depth = out_depths[out_depths != 0]
-        self.visu_perc_min_depth = np.percentile(non_zeros_depth, self.cfg.eval_depth_range_perc[0])
-        self.visu_perc_max_depth = np.percentile(non_zeros_depth, self.cfg.eval_depth_range_perc[1])
-        depth_color_maps = ['jet']
+        self.visu_perc_min_depth = np.percentile(
+            non_zeros_depth, self.cfg.eval_depth_range_perc[0]
+        )
+        self.visu_perc_max_depth = np.percentile(
+            non_zeros_depth, self.cfg.eval_depth_range_perc[1]
+        )
+        depth_color_maps = ["jet"]
         for depth_color_map in depth_color_maps:
             for i, depth in enumerate(out_depths):
                 self.save_image_grid(
@@ -430,13 +466,18 @@ class Fourdfy(BaseLift3DSystem):
                         {
                             "type": "grayscale",
                             "img": depth,
-                            "kwargs": {"cmap": depth_color_map, "data_range": 'nonzero'},
+                            "kwargs": {
+                                "cmap": depth_color_map,
+                                "data_range": "nonzero",
+                            },
                         },
                     ],
                     name="depth_test_step",
                     step=self.true_global_step,
                 )
-        extra_renderings = [f'depth-{depth_color_map}' for depth_color_map in depth_color_maps]
+        extra_renderings = [
+            f"depth-{depth_color_map}" for depth_color_map in depth_color_maps
+        ]
         for extra_rendering in extra_renderings:
             self.save_img_sequence(
                 f"it{self.true_global_step}-test-{extra_rendering}",

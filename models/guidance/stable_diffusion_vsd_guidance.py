@@ -2,6 +2,7 @@ import random
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 
+import threestudio
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -15,8 +16,6 @@ from diffusers.loaders import AttnProcsLayers
 from diffusers.models.attention_processor import LoRAAttnProcessor
 from diffusers.models.embeddings import TimestepEmbedding
 from diffusers.utils.import_utils import is_xformers_available
-
-import threestudio
 from threestudio.models.prompt_processors.base import PromptProcessorOutput
 from threestudio.utils.base import BaseModule
 from threestudio.utils.misc import C, cleanup, parse_version

@@ -8,13 +8,12 @@ import imageio
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
+import torchvision
 import trimesh
+import wandb
 from matplotlib import cm
 from matplotlib.colors import LinearSegmentedColormap
 from pytorch_lightning.loggers import WandbLogger
-import torchvision
-
-import wandb
 from threestudio.models.mesh import Mesh
 from threestudio.utils.typing import *
 
@@ -55,11 +54,13 @@ class SaverMixin:
 
     def create_loggers(self, cfg_loggers: DictConfig) -> None:
         if "wandb" in cfg_loggers.keys() and cfg_loggers.wandb.enable:
-            if 'save_dir' in cfg_loggers.wandb:
+            if "save_dir" in cfg_loggers.wandb:
                 save_dir = cfg_loggers.wandb.save_dir
             else:
                 save_dir = None
-            self._wandb_logger = WandbLogger(project=cfg_loggers.wandb.project, save_dir=save_dir)
+            self._wandb_logger = WandbLogger(
+                project=cfg_loggers.wandb.project, save_dir=save_dir
+            )
 
     def get_loggers(self) -> List:
         if self._wandb_logger:
@@ -181,12 +182,12 @@ class SaverMixin:
         img = np.nan_to_num(img)
         if data_range is None:
             img = (img - img.min()) / (img.max() - img.min())
-        elif data_range == 'nonzero':
+        elif data_range == "nonzero":
             perc_min = self.visu_perc_min_depth
             perc_max = self.visu_perc_max_depth
             img = img.clip(perc_min, perc_max)
             img = (img - perc_min) / (perc_max - perc_min)
-            img = 1-img
+            img = 1 - img
         else:
             img = img.clip(data_range[0], data_range[1])
             img = (img - data_range[0]) / (data_range[1] - data_range[0])
@@ -302,16 +303,18 @@ class SaverMixin:
         if video:
             B, H, W, C = imgs[0]["img"].shape
             for i, img_frames in enumerate(imgs):
-                imgs[i]['img'] = torch.cat([img for img in img_frames['img']], 1)
+                imgs[i]["img"] = torch.cat([img for img in img_frames["img"]], 1)
         img = self.get_image_grid_(imgs, align=align)
         filepath = self.get_save_path(filename)
         cv2.imwrite(filepath, img)
         if video:
-            img_video = np.stack([img[:, i*W:(i+1)*W] for i in range(B)])
+            img_video = np.stack([img[:, i * W : (i + 1) * W] for i in range(B)])
             img_video = [cv2.cvtColor(i, cv2.COLOR_BGR2RGB) for i in img_video]
             # imageio.mimsave(self.get_save_path(filename.replace(".png", ".mp4")), img_video, fps=fps)
-            torchvision.io.write_video(self.get_save_path(filename.replace(".png", ".mp4")), img_video, fps=fps)
-            
+            torchvision.io.write_video(
+                self.get_save_path(filename.replace(".png", ".mp4")), img_video, fps=fps
+            )
+
         if name and self._wandb_logger:
             wandb.log({name: wandb.Image(filepath), "trainer/global_step": step})
 
@@ -402,7 +405,7 @@ class SaverMixin:
             imgs = [cv2.cvtColor(i, cv2.COLOR_BGR2RGB) for i in imgs]
             # imageio.mimsave(self.get_save_path(filename), imgs, fps=fps)
             torchvision.io.write_video(self.get_save_path(filename), imgs, fps=fps)
-            
+
         if name and self._wandb_logger:
             wandb.log(
                 {

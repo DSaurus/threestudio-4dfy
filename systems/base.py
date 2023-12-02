@@ -2,15 +2,15 @@ import os
 from dataclasses import dataclass, field
 
 import pytorch_lightning as pl
-
 import threestudio
 from threestudio.models.exporters.base import Exporter, ExporterOutput
 from threestudio.systems.utils import parse_optimizer, parse_scheduler
 from threestudio.utils.base import Updateable, update_if_possible
 from threestudio.utils.config import parse_structured
 from threestudio.utils.misc import C, cleanup, get_device, load_module_weights
-from threestudio.utils.saving import SaverMixin
 from threestudio.utils.typing import *
+
+from ..utils.saving import SaverMixin
 
 
 class BaseSystem(pl.LightningModule, Updateable, SaverMixin):
@@ -207,7 +207,6 @@ class BaseLift3DSystem(BaseSystem):
         prompt_processor_type: str = ""
         prompt_processor: dict = field(default_factory=dict)
 
-        simultan: bool = False
         guidance_type_image: str = ""
         guidance_image: dict = field(default_factory=dict)
 

@@ -2,9 +2,8 @@ import os
 from dataclasses import dataclass, field
 from datetime import datetime
 
-from omegaconf import OmegaConf
-
 import threestudio
+from omegaconf import OmegaConf
 from threestudio.utils.typing import *
 
 # ============ Register OmegaConf Recolvers ============= #

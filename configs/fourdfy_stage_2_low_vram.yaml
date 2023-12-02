@@ -74,12 +74,15 @@ system:
   background_type: "neural-environment-map-background"
   background:
     color_activation: sigmoid
-    random_aug: true
+    random_aug: false
 
-  renderer_type: "nerf-volume-renderer"
+  renderer_type: "stable-nerf-volume-renderer"
   renderer:
-    radius: ${system.geometry.radius}
-    num_samples_per_ray: 512
+    base_renderer_type: "mask-nerf-volume-renderer"
+    base_renderer:
+      radius: ${system.geometry.radius}
+      num_samples_per_ray: 512
+      train_max_nums: 2000000
 
   prompt_processor_type: "stable-diffusion-prompt-processor"
   prompt_processor:

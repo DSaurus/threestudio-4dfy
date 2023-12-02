@@ -1,12 +1,11 @@
 from dataclasses import dataclass, field
 
+import threestudio
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from diffusers import IFPipeline
 from diffusers.utils.import_utils import is_xformers_available
-
-import threestudio
 from threestudio.models.prompt_processors.base import PromptProcessorOutput
 from threestudio.utils.base import BaseObject
 from threestudio.utils.misc import C, parse_version

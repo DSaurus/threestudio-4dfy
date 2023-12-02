@@ -4,11 +4,9 @@ import random
 from dataclasses import dataclass, field
 
 import pytorch_lightning as pl
+import threestudio
 import torch
 import torch.nn.functional as F
-from torch.utils.data import DataLoader, Dataset, IterableDataset
-
-import threestudio
 from threestudio import register
 from threestudio.utils.base import Updateable
 from threestudio.utils.config import parse_structured
@@ -20,6 +18,7 @@ from threestudio.utils.ops import (
     get_rays,
 )
 from threestudio.utils.typing import *
+from torch.utils.data import DataLoader, Dataset, IterableDataset
 
 
 @dataclass
@@ -67,6 +66,7 @@ class RandomCameraDataModuleConfig:
     num_test_loop_static: int = 4
     test_traj: Optional[str] = None
 
+
 class RandomCameraIterableDataset(IterableDataset, Updateable):
     def __init__(self, cfg: Any) -> None:
         super().__init__()
@@ -87,7 +87,7 @@ class RandomCameraIterableDataset(IterableDataset, Updateable):
             and len(self.widths) != 1
             and len(self.batch_sizes) == 1
         ):
-            self.batch_sizes = self.batch_sizes*len(self.heights)
+            self.batch_sizes = self.batch_sizes * len(self.heights)
         assert len(self.heights) == len(self.widths) == len(self.batch_sizes)
         self.resolution_milestones: List[int]
         if (
@@ -118,7 +118,9 @@ class RandomCameraIterableDataset(IterableDataset, Updateable):
         self.fovy_range = self.cfg.fovy_range
         self.simultan_idx = 0
         if self.cfg.simultan:
-            self.directions_unit_focals_vid = get_ray_directions(H=self.cfg.height_vid, W=self.cfg.width_vid, focal=1.0)
+            self.directions_unit_focals_vid = get_ray_directions(
+                H=self.cfg.height_vid, W=self.cfg.width_vid, focal=1.0
+            )
             self.height_vid = self.cfg.height_vid
             self.width_vid = self.cfg.width_vid
         else:
@@ -126,11 +128,18 @@ class RandomCameraIterableDataset(IterableDataset, Updateable):
             self.height_vid = None
             self.width_vid = None
         if self.cfg.train_dynamic_camera:
-            self.elevation_range_delta = (-180./(16*self.cfg.num_frames), 180./(16*self.cfg.num_frames))
-            self.azimuth_range_delta = (-180./(2*self.cfg.num_frames), 180./(2*self.cfg.num_frames))
+            self.elevation_range_delta = (
+                -180.0 / (16 * self.cfg.num_frames),
+                180.0 / (16 * self.cfg.num_frames),
+            )
+            self.azimuth_range_delta = (
+                -180.0 / (2 * self.cfg.num_frames),
+                180.0 / (2 * self.cfg.num_frames),
+            )
             self.camera_distance_range_delta = lambda x: (
-                (self.camera_distance_range[0]-x)/self.cfg.num_frames, (self.camera_distance_range[1]-x)/self.cfg.num_frames
-                )
+                (self.camera_distance_range[0] - x) / self.cfg.num_frames,
+                (self.camera_distance_range[1] - x) / self.cfg.num_frames,
+            )
 
     def update_step(self, epoch: int, global_step: int, on_load_weights: bool = False):
         size_ind = bisect.bisect_right(self.resolution_milestones, global_step) - 1
@@ -172,7 +181,7 @@ class RandomCameraIterableDataset(IterableDataset, Updateable):
             batch_factor = num_frames
         else:
             batch_factor = 1
-        batch_size = batch_size * batch_factor 
+        batch_size = batch_size * batch_factor
         # sample elevation angles
         elevation_deg: Float[Tensor, "B"]
         elevation: Float[Tensor, "B"]
@@ -245,7 +254,9 @@ class RandomCameraIterableDataset(IterableDataset, Updateable):
             + self.cfg.camera_distance_range[0]
         )
         if train_dynamic_camera:
-            camera_distance_range_delta = self.camera_distance_range_delta(camera_distances[0])
+            camera_distance_range_delta = self.camera_distance_range_delta(
+                camera_distances[0]
+            )
             camera_distance_delta = (
                 torch.rand(self.batch_size)
                 * (camera_distance_range_delta[1] - camera_distance_range_delta[0])
@@ -308,7 +319,8 @@ class RandomCameraIterableDataset(IterableDataset, Updateable):
             # sample light direction from a normal distribution with mean camera_position and std light_position_perturb
             light_direction: Float[Tensor, "B 3"] = F.normalize(
                 camera_positions
-                + torch.randn(self.batch_size, 3).repeat(batch_factor, 1) * self.cfg.light_position_perturb,
+                + torch.randn(self.batch_size, 3).repeat(batch_factor, 1)
+                * self.cfg.light_position_perturb,
                 dim=-1,
             )
             # get light position by scaling light direction by light distance
@@ -329,10 +341,14 @@ class RandomCameraIterableDataset(IterableDataset, Updateable):
             rot = torch.stack([local_x, local_y, local_z], dim=-1)
             light_azimuth = (
                 torch.rand(self.batch_size) * math.pi - 2 * math.pi
-            ).repeat(batch_factor)  # [-pi, pi]
+            ).repeat(
+                batch_factor
+            )  # [-pi, pi]
             light_elevation = (
                 torch.rand(self.batch_size) * math.pi / 3 + math.pi / 6
-            ).repeat(batch_factor)  # [pi/6, pi/2]
+            ).repeat(
+                batch_factor
+            )  # [pi/6, pi/2]
             light_positions_local = torch.stack(
                 [
                     light_distances
@@ -382,8 +398,10 @@ class RandomCameraIterableDataset(IterableDataset, Updateable):
 
         # Dynamic
         if self.cfg.sample_rand_frames == "t0":
-            t0 = torch.FloatTensor(1).uniform_(0, 1/num_frames).item()
-            frame_times = torch.linspace(t0, t0+(num_frames-1)/num_frames, num_frames)
+            t0 = torch.FloatTensor(1).uniform_(0, 1 / num_frames).item()
+            frame_times = torch.linspace(
+                t0, t0 + (num_frames - 1) / num_frames, num_frames
+            )
         else:
             frame_times = torch.linspace(0.0, 1.0, num_frames)
         return {
@@ -415,23 +433,23 @@ class RandomCameraDataset(Dataset):
             self.n_views = self.cfg.n_val_views
         else:
             self.n_views = self.cfg.n_test_views
-        
+
         num_frames = self.cfg.num_frames
         if self.cfg.static:
             n_views_azimuth = self.n_views
         else:
             if split in ["val", "test"] and not self.cfg.static:
-                num_frames = num_frames*self.cfg.num_frames_factor
+                num_frames = num_frames * self.cfg.num_frames_factor
             if self.split == "test":
-                if self.cfg.test_traj in ['motion_smooth', 'motion_smooth_full']:
-                    self.n_views = num_frames*2
-                    n_views_azimuth = self.n_views//8
-                    if self.cfg.test_traj == 'motion_smooth':
-                        self.n_views = self.n_views-4
+                if self.cfg.test_traj in ["motion_smooth", "motion_smooth_full"]:
+                    self.n_views = num_frames * 2
+                    n_views_azimuth = self.n_views // 8
+                    if self.cfg.test_traj == "motion_smooth":
+                        self.n_views = self.n_views - 4
                     num_frames_static = n_views_azimuth
                 else:
-                    n_views_azimuth = num_frames*self.cfg.num_test_loop_factor
-                    self.n_views = 2*n_views_azimuth*self.cfg.num_test_loop_static
+                    n_views_azimuth = num_frames * self.cfg.num_test_loop_factor
+                    self.n_views = 2 * n_views_azimuth * self.cfg.num_test_loop_static
                     num_frames_static = num_frames
             elif self.split == "val":
                 n_views_azimuth = self.n_views
@@ -439,10 +457,12 @@ class RandomCameraDataset(Dataset):
         azimuth_deg: Float[Tensor, "B"]
         if self.split == "val":
             # make sure the first and last view are not the same
-            azimuth_deg = torch.linspace(0, 360.0, n_views_azimuth + 1)[: n_views_azimuth]
+            azimuth_deg = torch.linspace(0, 360.0, n_views_azimuth + 1)[
+                :n_views_azimuth
+            ]
         # else:
-            # azimuth_deg = torch.linspace(0, 360.0, n_views_azimuth
-            # )
+        # azimuth_deg = torch.linspace(0, 360.0, n_views_azimuth
+        # )
         elif self.split == "test":
             if self.cfg.static:
                 azimuth_deg = torch.linspace(0, 360.0, n_views_azimuth)
@@ -450,16 +470,20 @@ class RandomCameraDataset(Dataset):
                 assert n_views_azimuth % self.cfg.num_test_loop_static == 0
                 azimuth_deg = []
                 for i in range(self.cfg.num_test_loop_static):
-                    if self.cfg.test_traj in ['motion_smooth', 'motion_smooth_full']:
-                        azimuth_start = (self.cfg.num_test_loop_static-i)*90.
-                        azimuth_end = (self.cfg.num_test_loop_static-i-1)*90.
+                    if self.cfg.test_traj in ["motion_smooth", "motion_smooth_full"]:
+                        azimuth_start = (self.cfg.num_test_loop_static - i) * 90.0
+                        azimuth_end = (self.cfg.num_test_loop_static - i - 1) * 90.0
                     else:
-                        azimuth_start = i*90.
-                        azimuth_end = (i+1)*90.
-                    azimuth_static_deg_i = torch.full((num_frames_static,), azimuth_start)
+                        azimuth_start = i * 90.0
+                        azimuth_end = (i + 1) * 90.0
+                    azimuth_static_deg_i = torch.full(
+                        (num_frames_static,), azimuth_start
+                    )
                     azimuth_deg.append(azimuth_static_deg_i)
-                    azimuth_dynamic_deg_i = torch.linspace(azimuth_start, azimuth_end, n_views_azimuth)
-                    if self.cfg.test_traj == 'motion_smooth':
+                    azimuth_dynamic_deg_i = torch.linspace(
+                        azimuth_start, azimuth_end, n_views_azimuth
+                    )
+                    if self.cfg.test_traj == "motion_smooth":
                         azimuth_dynamic_deg_i = azimuth_dynamic_deg_i[1:]
                     azimuth_deg.append(azimuth_dynamic_deg_i)
                 azimuth_deg = torch.cat(azimuth_deg)
@@ -530,21 +554,19 @@ class RandomCameraDataset(Dataset):
         )  # FIXME: hard-coded near and far
         mvp_mtx: Float[Tensor, "B 4 4"] = get_mvp_matrix(c2w, proj_mtx)
 
-        if self.cfg.test_traj in ['motion_smooth', 'motion_smooth_full']:
+        if self.cfg.test_traj in ["motion_smooth", "motion_smooth_full"]:
             frame_times = torch.linspace(0, 1.0, num_frames)
-            if self.cfg.test_traj == 'motion_smooth':
-                frame_times = frame_times[:num_frames-2]
+            if self.cfg.test_traj == "motion_smooth":
+                frame_times = frame_times[: num_frames - 2]
             else:
                 frame_times = frame_times[:num_frames]
-            frame_times = frame_times.repeat(math.ceil(self.n_views/num_frames))
+            frame_times = frame_times.repeat(math.ceil(self.n_views / num_frames))
         else:
-            frame_times = torch.linspace(
-            0, 1.0, num_frames
-            ).repeat(math.ceil(self.n_views/num_frames))
-            frame_times = frame_times[:self.n_views]
-        frame_times_video = torch.linspace(
-            0, 1.0, num_frames
+            frame_times = torch.linspace(0, 1.0, num_frames).repeat(
+                math.ceil(self.n_views / num_frames)
             )
+            frame_times = frame_times[: self.n_views]
+        frame_times_video = torch.linspace(0, 1.0, num_frames)
         self.rays_o, self.rays_d = rays_o, rays_d
         self.mvp_mtx = mvp_mtx
         self.c2w = c2w

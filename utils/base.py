@@ -2,7 +2,6 @@ from dataclasses import dataclass
 
 import torch
 import torch.nn as nn
-
 from threestudio.utils.config import parse_structured
 from threestudio.utils.misc import get_device, load_module_weights
 from threestudio.utils.typing import *

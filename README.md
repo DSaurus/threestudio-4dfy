@@ -49,7 +49,7 @@ MVDream multi-view diffusion model is provided in a different codebase. Install 
 
 ```sh
 git clone https://github.com/bytedance/MVDream extern/MVDream
-pip install -e extern/MVDream 
+pip install -e extern/MVDream
 ```
 
 ## Quickstart

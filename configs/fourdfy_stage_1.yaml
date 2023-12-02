@@ -105,7 +105,7 @@ system:
     max_step_percent: 0.5
     max_step_percent_annealed: 0.5
     anneal_start_step: 5000
-  
+
   guidance_type_multi_view: "multiview-diffusion-guidance"
   guidance_multi_view:
     model_name: "sd-v2.1-base-4view"
@@ -115,7 +115,7 @@ system:
     max_step_percent: [0, 0.98, 0.50, 8000]
     recon_loss: true
     recon_std_rescale: 0.5
-  
+
   prompt_processor_type_video: "zeroscope-prompt-processor"
   prompt_processor_video:
     pretrained_model_name_or_path: "cerspense/zeroscope_v2_576w"

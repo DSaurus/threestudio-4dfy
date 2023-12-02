@@ -1,10 +1,9 @@
 from dataclasses import dataclass, field
 
+import threestudio
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
-import threestudio
 from threestudio.models.background.base import BaseBackground
 from threestudio.utils.typing import *
 

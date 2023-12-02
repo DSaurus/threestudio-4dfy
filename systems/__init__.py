@@ -1,3 +1,1 @@
-from . import (
-    fourdfy,
-)
+from . import fourdfy

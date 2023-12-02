@@ -2,11 +2,10 @@ import sys
 import warnings
 from bisect import bisect_right
 
+import threestudio
 import torch
 import torch.nn as nn
 from torch.optim import lr_scheduler
-
-import threestudio
 
 
 def get_scheduler(name):

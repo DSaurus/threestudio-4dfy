@@ -2,9 +2,8 @@ from dataclasses import dataclass, field
 
 import cv2
 import numpy as np
-import torch
-
 import threestudio
+import torch
 from threestudio.models.background.base import BaseBackground
 from threestudio.models.exporters.base import Exporter, ExporterOutput
 from threestudio.models.geometry.base import BaseImplicitGeometry

@@ -5,7 +5,6 @@ import re
 import tinycudann as tcnn
 import torch
 from packaging import version
-
 from threestudio.utils.config import config_to_primitive
 from threestudio.utils.typing import *
 

@@ -5,10 +5,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from igl import fast_winding_number_for_meshes, point_mesh_squared_distance, read_obj
+from threestudio.utils.typing import *
 from torch.autograd import Function
 from torch.cuda.amp import custom_bwd, custom_fwd
-
-from threestudio.utils.typing import *
 
 
 def dot(x, y):

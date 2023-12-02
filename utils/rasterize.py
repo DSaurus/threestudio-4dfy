@@ -1,6 +1,5 @@
 import nvdiffrast.torch as dr
 import torch
-
 from threestudio.utils.typing import *
 
 

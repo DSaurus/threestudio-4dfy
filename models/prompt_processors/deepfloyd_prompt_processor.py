@@ -2,15 +2,14 @@ import json
 import os
 from dataclasses import dataclass
 
+import threestudio
 import torch
 import torch.nn as nn
 from diffusers import IFPipeline
-from transformers import T5EncoderModel, T5Tokenizer
-
-import threestudio
 from threestudio.models.prompt_processors.base import PromptProcessor, hash_prompt
 from threestudio.utils.misc import cleanup
 from threestudio.utils.typing import *
+from transformers import T5EncoderModel, T5Tokenizer
 
 
 @threestudio.register("deep-floyd-prompt-processor")

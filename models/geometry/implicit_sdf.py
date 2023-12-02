@@ -2,11 +2,10 @@ import os
 from dataclasses import dataclass, field
 
 import numpy as np
+import threestudio
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
-import threestudio
 from threestudio.models.geometry.base import BaseImplicitGeometry, contract_to_unisphere
 from threestudio.models.mesh import Mesh
 from threestudio.models.networks import get_encoding, get_mlp

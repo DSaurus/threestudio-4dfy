@@ -1,19 +1,19 @@
 from dataclasses import dataclass, field
 
 import numpy as np
+import threestudio
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
-import threestudio
 from threestudio.models.geometry.base import (
     BaseGeometry,
     BaseImplicitGeometry,
     contract_to_unisphere,
 )
-from ..networks import get_encoding, get_mlp
 from threestudio.utils.ops import get_activation
 from threestudio.utils.typing import *
+
+from ..networks import get_encoding, get_mlp
 
 
 @threestudio.register("implicit-volume")
@@ -93,10 +93,9 @@ class ImplicitVolume(BaseImplicitGeometry):
             # pre-activation density bias
             density_bias = (
                 self.cfg.density_blob_scale
-                * (
-                    1
-                    - torch.sqrt((points**2).sum(dim=-1)) / self.density_blob_std
-                )[..., None]
+                * (1 - torch.sqrt((points**2).sum(dim=-1)) / self.density_blob_std)[
+                    ..., None
+                ]
             )
         elif isinstance(self.cfg.density_bias, float):
             density_bias = self.cfg.density_bias
@@ -252,17 +251,16 @@ class ImplicitVolume(BaseImplicitGeometry):
             raise TypeError(
                 f"Cannot create {ImplicitVolume.__name__} from {other.__class__.__name__}"
             )
-    
+
     def update_step(
         self, epoch: int, global_step: int, on_load_weights: bool = False
     ) -> None:
         if self.cfg.anneal_density_blob_std_config is not None:
             min_step = self.cfg.anneal_density_blob_std_config.min_anneal_step
             max_step = self.cfg.anneal_density_blob_std_config.max_anneal_step
-            if (
-                global_step >= min_step
-                and global_step <= max_step
-            ):  
+            if global_step >= min_step and global_step <= max_step:
                 end_val = self.cfg.anneal_density_blob_std_config.end_val
                 start_val = self.cfg.anneal_density_blob_std_config.start_val
-                self.density_blob_std = start_val + (global_step - min_step)*(end_val - start_val)/(max_step - min_step)
+                self.density_blob_std = start_val + (global_step - min_step) * (
+                    end_val - start_val
+                ) / (max_step - min_step)

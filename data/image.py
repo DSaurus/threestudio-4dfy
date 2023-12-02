@@ -7,8 +7,6 @@ import numpy as np
 import pytorch_lightning as pl
 import torch
 import torch.nn.functional as F
-from torch.utils.data import DataLoader, Dataset, IterableDataset
-
 from threestudio import register
 from threestudio.data.uncond import (
     RandomCameraDataModuleConfig,
@@ -24,6 +22,7 @@ from threestudio.utils.ops import (
     get_rays,
 )
 from threestudio.utils.typing import *
+from torch.utils.data import DataLoader, Dataset, IterableDataset
 
 
 @dataclass

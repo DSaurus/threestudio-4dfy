@@ -1,6 +1,6 @@
 import math
-import random
 import os
+import random
 from dataclasses import dataclass, field
 
 import cv2
@@ -8,15 +8,8 @@ import numpy as np
 import pytorch_lightning as pl
 import torch
 import torch.nn.functional as F
-from torch.utils.data import DataLoader, Dataset, IterableDataset
-
 from threestudio import register
 from threestudio.utils.base import Updateable
-from .uncond import (
-    RandomCameraDataModuleConfig,
-    RandomCameraDataset,
-    RandomCameraIterableDataset,
-)
 from threestudio.utils.config import parse_structured
 from threestudio.utils.misc import get_rank
 from threestudio.utils.ops import (
@@ -26,6 +19,13 @@ from threestudio.utils.ops import (
     get_rays,
 )
 from threestudio.utils.typing import *
+from torch.utils.data import DataLoader, Dataset, IterableDataset
+
+from .uncond import (
+    RandomCameraDataModuleConfig,
+    RandomCameraDataset,
+    RandomCameraIterableDataset,
+)
 
 
 @dataclass
@@ -34,14 +34,16 @@ class RandomMultiviewCameraDataModuleConfig(RandomCameraDataModuleConfig):
     n_view: int = 1
     zoom_range: Tuple[float, float] = (1.0, 1.0)
 
-class RandomMultiviewCameraIterableDataset(RandomCameraIterableDataset):
 
+class RandomMultiviewCameraIterableDataset(RandomCameraIterableDataset):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.zoom_range = self.cfg.zoom_range
 
     def collate(self, batch) -> Dict[str, Any]:
-        assert self.batch_size % self.cfg.n_view == 0, f"batch_size ({self.batch_size}) must be dividable by n_view ({self.cfg.n_view})!"
+        assert (
+            self.batch_size % self.cfg.n_view == 0
+        ), f"batch_size ({self.batch_size}) must be dividable by n_view ({self.cfg.n_view})!"
         real_batch_size = self.batch_size // self.cfg.n_view
 
         # sample elevation angles
@@ -77,7 +79,8 @@ class RandomMultiviewCameraIterableDataset(RandomCameraIterableDataset):
         azimuth_deg: Float[Tensor, "B"]
         # ensures sampled azimuth angles in a batch cover the whole range
         azimuth_deg = (
-            torch.rand(real_batch_size).reshape(-1,1) + torch.arange(self.cfg.n_view).reshape(1,-1)
+            torch.rand(real_batch_size).reshape(-1, 1)
+            + torch.arange(self.cfg.n_view).reshape(1, -1)
         ).reshape(-1) / self.cfg.n_view * (
             self.azimuth_range[1] - self.azimuth_range[0]
         ) + self.azimuth_range[
@@ -88,8 +91,7 @@ class RandomMultiviewCameraIterableDataset(RandomCameraIterableDataset):
         ######## Different from original ########
         # sample fovs from a uniform distribution bounded by fov_range
         fovy_deg: Float[Tensor, "B"] = (
-            torch.rand(real_batch_size)
-            * (self.fovy_range[1] - self.fovy_range[0])
+            torch.rand(real_batch_size) * (self.fovy_range[1] - self.fovy_range[0])
             + self.fovy_range[0]
         ).repeat_interleave(self.cfg.n_view, dim=0)
         fovy = fovy_deg * math.pi / 180
@@ -106,8 +108,7 @@ class RandomMultiviewCameraIterableDataset(RandomCameraIterableDataset):
 
         # zoom in by decreasing fov after camera distance is fixed
         zoom: Float[Tensor, "B"] = (
-            torch.rand(real_batch_size)
-            * (self.zoom_range[1] - self.zoom_range[0])
+            torch.rand(real_batch_size) * (self.zoom_range[1] - self.zoom_range[0])
             + self.zoom_range[0]
         ).repeat_interleave(self.cfg.n_view, dim=0)
         fovy = fovy * zoom
@@ -161,7 +162,10 @@ class RandomMultiviewCameraIterableDataset(RandomCameraIterableDataset):
             # sample light direction from a normal distribution with mean camera_position and std light_position_perturb
             light_direction: Float[Tensor, "B 3"] = F.normalize(
                 camera_positions
-                + torch.randn(real_batch_size, 3).repeat_interleave(self.cfg.n_view, dim=0) * self.cfg.light_position_perturb,
+                + torch.randn(real_batch_size, 3).repeat_interleave(
+                    self.cfg.n_view, dim=0
+                )
+                * self.cfg.light_position_perturb,
                 dim=-1,
             )
             # get light position by scaling light direction by light distance
@@ -182,10 +186,14 @@ class RandomMultiviewCameraIterableDataset(RandomCameraIterableDataset):
             rot = torch.stack([local_x, local_y, local_z], dim=-1)
             light_azimuth = (
                 torch.rand(real_batch_size) * math.pi - 2 * math.pi
-            ).repeat_interleave(self.cfg.n_view, dim=0)  # [-pi, pi]
+            ).repeat_interleave(
+                self.cfg.n_view, dim=0
+            )  # [-pi, pi]
             light_elevation = (
                 torch.rand(real_batch_size) * math.pi / 3 + math.pi / 6
-            ).repeat_interleave(self.cfg.n_view, dim=0)  # [pi/6, pi/2]
+            ).repeat_interleave(
+                self.cfg.n_view, dim=0
+            )  # [pi/6, pi/2]
             light_positions_local = torch.stack(
                 [
                     light_distances
@@ -234,8 +242,12 @@ class RandomMultiviewCameraIterableDataset(RandomCameraIterableDataset):
         mvp_mtx: Float[Tensor, "B 4 4"] = get_mvp_matrix(c2w, proj_mtx)
 
         if self.cfg.sample_rand_frames == "t0":
-            t0 = torch.FloatTensor(1).uniform_(0, 1/self.cfg.num_frames).item()
-            frame_times = torch.linspace(t0, t0+(self.cfg.num_frames-1)/self.cfg.num_frames, self.cfg.num_frames)
+            t0 = torch.FloatTensor(1).uniform_(0, 1 / self.cfg.num_frames).item()
+            frame_times = torch.linspace(
+                t0,
+                t0 + (self.cfg.num_frames - 1) / self.cfg.num_frames,
+                self.cfg.num_frames,
+            )
         else:
             frame_times = torch.linspace(0.0, 1.0, self.cfg.num_frames)
 

@@ -3,7 +3,6 @@ import shutil
 import subprocess
 
 import pytorch_lightning
-
 from threestudio.utils.config import dump_config
 from threestudio.utils.misc import parse_version
 
@@ -12,9 +11,9 @@ if parse_version(pytorch_lightning.__version__) > parse_version("1.8"):
 else:
     from pytorch_lightning.callbacks.base import Callback
 
+from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.callbacks.progress import TQDMProgressBar
 from pytorch_lightning.utilities.rank_zero import rank_zero_only, rank_zero_warn
-from pytorch_lightning.callbacks import ModelCheckpoint
 
 
 class VersionedCallback(Callback):

@@ -1,22 +1,20 @@
-from dataclasses import dataclass, field
 import inspect
-from tqdm import tqdm
+from dataclasses import dataclass, field
 
+import numpy as np
+import threestudio
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from diffusers import DDIMScheduler, DDPMScheduler, StableDiffusionPipeline
 from diffusers.utils.import_utils import is_xformers_available
-
-import threestudio
 from threestudio.models.prompt_processors.base import PromptProcessorOutput
 from threestudio.utils.base import BaseObject
 from threestudio.utils.misc import C, cleanup, parse_version
 from threestudio.utils.typing import *
+from tqdm import tqdm
+from transformers import CLIPTextModel, CLIPTokenizer
 
-from transformers import CLIPTokenizer, CLIPTextModel
-
-import numpy as np
 
 @threestudio.register("zeroscope-guidance")
 class ZeroscopeGuidance(BaseObject):
@@ -28,9 +26,7 @@ class ZeroscopeGuidance(BaseObject):
         enable_attention_slicing: bool = False
         enable_channels_last_format: bool = False
         guidance_scale: float = 100.0
-        grad_clip: Optional[
-            Any
-        ] = None 
+        grad_clip: Optional[Any] = None
         half_precision_weights: bool = True
 
         min_step_percent: float = 0.02
@@ -46,6 +42,8 @@ class ZeroscopeGuidance(BaseObject):
         token_merging_params: Optional[dict] = field(default_factory=dict)
 
         view_dependent_prompting: bool = True
+
+        low_ram_vae: bool = False
 
     cfg: Config
 
@@ -70,15 +68,16 @@ class ZeroscopeGuidance(BaseObject):
 
         # Extra modules
         self.tokenizer = CLIPTokenizer.from_pretrained(
-            self.cfg.pretrained_model_name_or_path, subfolder="tokenizer",
-            torch_dtype=self.weights_dtype
+            self.cfg.pretrained_model_name_or_path,
+            subfolder="tokenizer",
+            torch_dtype=self.weights_dtype,
         )
         self.text_encoder = CLIPTextModel.from_pretrained(
-            self.cfg.pretrained_model_name_or_path, subfolder="text_encoder",
-            torch_dtype=self.weights_dtype
+            self.cfg.pretrained_model_name_or_path,
+            subfolder="text_encoder",
+            torch_dtype=self.weights_dtype,
         )
         self.text_encoder = self.text_encoder.to(self.device)
-
 
         if self.cfg.enable_memory_efficient_attention:
             if parse_version(torch.__version__) >= parse_version("2"):
@@ -166,7 +165,7 @@ class ZeroscopeGuidance(BaseObject):
             t.to(self.weights_dtype),
             encoder_hidden_states=encoder_hidden_states.to(self.weights_dtype),
         ).sample.to(input_dtype)
-    
+
     @torch.cuda.amp.autocast(enabled=False)
     def encode_images(
         self, imgs: Float[Tensor, "B 3 N 320 576"], normalize: bool = True
@@ -177,13 +176,48 @@ class ZeroscopeGuidance(BaseObject):
             imgs = imgs[:, :, None]
         # breakpoint()
         batch_size, channels, num_frames, height, width = imgs.shape
-        imgs = imgs.permute(0, 2, 1, 3, 4).reshape(batch_size * num_frames, channels, height, width)
+        imgs = imgs.permute(0, 2, 1, 3, 4).reshape(
+            batch_size * num_frames, channels, height, width
+        )
         input_dtype = imgs.dtype
         if normalize:
             imgs = imgs * 2.0 - 1.0
         # breakpoint()
-        posterior = self.vae.encode(imgs.to(self.weights_dtype)).latent_dist
-        latents = posterior.sample() * self.vae.config.scaling_factor
+
+        if self.cfg.low_ram_vae > 0:
+            vnum = self.cfg.low_ram_vae
+            mask_vae = torch.randperm(imgs.shape[0]) < vnum
+            with torch.no_grad():
+                posterior_mask = torch.cat(
+                    [
+                        self.vae.encode(
+                            imgs[~mask_vae][i : i + 1].to(self.weights_dtype)
+                        ).latent_dist.sample()
+                        for i in range(imgs.shape[0] - vnum)
+                    ],
+                    dim=0,
+                )
+            posterior = torch.cat(
+                [
+                    self.vae.encode(
+                        imgs[mask_vae][i : i + 1].to(self.weights_dtype)
+                    ).latent_dist.sample()
+                    for i in range(vnum)
+                ],
+                dim=0,
+            )
+            posterior_full = torch.zeros(
+                imgs.shape[0],
+                *posterior.shape[1:],
+                device=posterior.device,
+                dtype=posterior.dtype,
+            )
+            posterior_full[~mask_vae] = posterior_mask
+            posterior_full[mask_vae] = posterior
+            latents = posterior_full * self.vae.config.scaling_factor
+        else:
+            posterior = self.vae.encode(imgs.to(self.weights_dtype)).latent_dist
+            latents = posterior.sample() * self.vae.config.scaling_factor
 
         latents = (
             latents[None, :]
@@ -198,14 +232,16 @@ class ZeroscopeGuidance(BaseObject):
             .permute(0, 2, 1, 3, 4)
         )
         return latents.to(input_dtype)
-    
+
     @torch.cuda.amp.autocast(enabled=False)
     def decode_latents(self, latents):
         # TODO: Make decoding align with previous version
         latents = 1 / self.vae.config.scaling_factor * latents
 
         batch_size, channels, num_frames, height, width = latents.shape
-        latents = latents.permute(0, 2, 1, 3, 4).reshape(batch_size * num_frames, channels, height, width)
+        latents = latents.permute(0, 2, 1, 3, 4).reshape(
+            batch_size * num_frames, channels, height, width
+        )
 
         image = self.vae.decode(latents).sample
         video = (
@@ -317,7 +353,7 @@ class ZeroscopeGuidance(BaseObject):
         rgb_BCHW = rgb.permute(0, 3, 1, 2)
         batch_size = rgb_BCHW.shape[0] // num_frames
         latents: Float[Tensor, "B 4 40 72"]
-        if kwargs['train_dynamic_camera']:
+        if kwargs["train_dynamic_camera"]:
             elevation = elevation[[0]]
             azimuth = azimuth[[0]]
             camera_distances = camera_distances[[0]]

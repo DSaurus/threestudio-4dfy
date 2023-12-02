@@ -1,11 +1,10 @@
 import math
 
+import threestudio
 import tinycudann as tcnn
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
-import threestudio
 from threestudio.utils.base import Updateable
 from threestudio.utils.config import config_to_primitive
 from threestudio.utils.misc import get_rank
@@ -63,19 +62,24 @@ class TCNNEncoding(nn.Module):
     def forward(self, x):
         return self.encoding(x)
 
+
 class TCNNEncodingSpatialTime(nn.Module):
-    def __init__(self, in_channels, config, dtype=torch.float32, init_time_zero=False) -> None:
+    def __init__(
+        self, in_channels, config, dtype=torch.float32, init_time_zero=False
+    ) -> None:
         super().__init__()
         self.n_input_dims = in_channels
         config["otype"] = "HashGrid"
-        self.num_frames = 1 #config["num_frames"]
+        self.num_frames = 1  # config["num_frames"]
         self.static = config["static"]
         self.cfg = config_to_primitive(config)
         self.cfg_time = self.cfg
         self.n_key_frames = config.get("n_key_frames", 1)
         with torch.cuda.device(get_rank()):
             self.encoding = tcnn.Encoding(self.n_input_dims, self.cfg, dtype=dtype)
-            self.encoding_time = tcnn.Encoding(self.n_input_dims + 1, self.cfg_time, dtype=dtype)
+            self.encoding_time = tcnn.Encoding(
+                self.n_input_dims + 1, self.cfg_time, dtype=dtype
+            )
         self.n_output_dims = self.encoding.n_output_dims
         self.frame_time = None
         if self.static:
@@ -83,7 +87,7 @@ class TCNNEncodingSpatialTime(nn.Module):
         self.use_key_frame = config.get("use_key_frame", False)
         self.is_video = True
         self.update_occ_grid = False
-    
+
     def set_temp_param_grad(self, requires_grad=False):
         self.set_param_grad(self.encoding_time, requires_grad=requires_grad)
 
@@ -99,19 +103,25 @@ class TCNNEncodingSpatialTime(nn.Module):
             frame_time = self.frame_time
         else:
             if (self.static or not self.training) and self.frame_time is None:
-                frame_time = torch.zeros((self.num_frames, 1), device=x.device, dtype=x.dtype).expand(x.shape[0], 1)
+                frame_time = torch.zeros(
+                    (self.num_frames, 1), device=x.device, dtype=x.dtype
+                ).expand(x.shape[0], 1)
             else:
                 if self.frame_time is None:
                     frame_time = 0.0
                 else:
                     frame_time = self.frame_time
-                frame_time = (torch.ones((self.num_frames, 1), device=x.device, dtype=x.dtype)*frame_time).expand(x.shape[0], 1)
+                frame_time = (
+                    torch.ones((self.num_frames, 1), device=x.device, dtype=x.dtype)
+                    * frame_time
+                ).expand(x.shape[0], 1)
             frame_time = frame_time.view(-1, 1)
         enc_space = self.encoding(x)
         x_frame_time = torch.cat((x, frame_time), 1)
         enc_space_time = self.encoding_time(x_frame_time)
         enc = enc_space + enc_space_time
         return enc
+
 
 class ProgressiveBandHashGrid(nn.Module, Updateable):
     def __init__(self, in_channels, config, dtype=torch.float32):
@@ -206,18 +216,34 @@ class VanillaMLP(nn.Module):
             config["n_hidden_layers"],
         )
         layers = [
-            self.make_linear(dim_in, self.n_neurons, is_first=True, is_last=False, bias=config.get("bias", False)),
+            self.make_linear(
+                dim_in,
+                self.n_neurons,
+                is_first=True,
+                is_last=False,
+                bias=config.get("bias", False),
+            ),
             self.make_activation(),
         ]
         for i in range(self.n_hidden_layers - 1):
             layers += [
                 self.make_linear(
-                    self.n_neurons, self.n_neurons, is_first=False, is_last=False, bias=config.get("bias", False)
+                    self.n_neurons,
+                    self.n_neurons,
+                    is_first=False,
+                    is_last=False,
+                    bias=config.get("bias", False),
                 ),
                 self.make_activation(),
             ]
         layers += [
-            self.make_linear(self.n_neurons, dim_out, is_first=False, is_last=True, bias=config.get("bias", False))
+            self.make_linear(
+                self.n_neurons,
+                dim_out,
+                is_first=False,
+                is_last=True,
+                bias=config.get("bias", False),
+            )
         ]
         self.layers = nn.Sequential(*layers)
         self.output_activation = get_activation(config.get("output_activation", None))

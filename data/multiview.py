@@ -7,18 +7,17 @@ from dataclasses import dataclass
 import cv2
 import numpy as np
 import pytorch_lightning as pl
+import threestudio
 import torch
 import torch.nn.functional as F
 from scipy.spatial.transform import Rotation as Rot
 from scipy.spatial.transform import Slerp
-from torch.utils.data import DataLoader, Dataset, IterableDataset
-from tqdm import tqdm
-
-import threestudio
 from threestudio import register
 from threestudio.utils.config import parse_structured
 from threestudio.utils.ops import get_mvp_matrix, get_ray_directions, get_rays
 from threestudio.utils.typing import *
+from torch.utils.data import DataLoader, Dataset, IterableDataset
+from tqdm import tqdm
 
 
 def convert_pose(C2W):

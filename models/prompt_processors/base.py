@@ -2,12 +2,11 @@ import json
 import os
 from dataclasses import dataclass
 
+import threestudio
 import torch
 import torch.multiprocessing as mp
 import torch.nn as nn
 from pytorch_lightning.utilities.rank_zero import rank_zero_only
-
-import threestudio
 from threestudio.utils.base import BaseObject
 from threestudio.utils.misc import barrier, cleanup
 from threestudio.utils.typing import *
