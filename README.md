@@ -1,6 +1,6 @@
 # 4D-fy - threestudio
 
-| [Project Page](https://sherwinbahmani.github.io/4dfy/) | [Paper](https://arxiv.org/pdf/2311.17984.pdf) | [User Study Template](https://github.com/victor-rong/video-generation-study) |
+| [Project Page](https://sherwinbahmani.github.io/4dfy/) | [Paper](https://arxiv.org/abs/2311.17984) | [User Study Template](https://github.com/victor-rong/video-generation-study) |
 
 - **This code is forked from [threestudio](https://github.com/threestudio-project/threestudio).**
 
@@ -10,7 +10,7 @@
 
 **This part is the same as original threestudio. Skip it if you already have installed the environment.**
 
-- You must have an NVIDIA graphics card with at least 40GB VRAM and have [CUDA](https://developer.nvidia.com/cuda-downloads) installed.
+- You must have an NVIDIA graphics card with at least 24GB VRAM and have [CUDA](https://developer.nvidia.com/cuda-downloads) installed.
 - Install `Python >= 3.8`.
 - (Optional, Recommended) Create a virtual environment:
 
@@ -61,8 +61,24 @@ seed=0
 gpu=0
 exp_root_dir=/path/to
 
+# If you have a 24/40/48 GB GPU, you can use the low_vram config files:
+
 # Stage 1
-# python launch.py --config custom/threestudio-4dfy/configs/fourdfy_stage_1.yaml --train --gpu $gpu exp_root_dir=$exp_root_dir seed=$seed system.prompt_processor.prompt="a dog riding a skateboard"
+# python launch.py --config configs/fourdfy_stage_1_low_vram.yaml --train --gpu $gpu exp_root_dir=$exp_root_dir seed=$seed system.prompt_processor.prompt="a dog riding a skateboard"
+
+# Stage 2
+# ckpt=/path/to/fourdfy_stage_1/a_dog_riding_a_skateboard@timestamp/ckpts/last.ckpt
+# python launch.py --config configs/fourdfy_stage_2_low_vram.yaml --train --gpu $gpu exp_root_dir=$exp_root_dir seed=$seed system.prompt_processor.prompt="a dog riding a skateboard" system.weights=$ckpt
+
+# Stage 3
+# ckpt=/path/to/fourdfy_stage_2/a_dog_riding_a_skateboard@timestamp/ckpts/last.ckpt
+# python launch.py --config configs/fourdfy_stage_3_low_vram.yaml --train --gpu $gpu exp_root_dir=$exp_root_dir seed=$seed system.prompt_processor.prompt="a dog riding a skateboard" system.weights=$ckpt
+
+
+# If you have a 80 GB GPU, you can use the original config files:
+
+# Stage 1
+# python launch.py --config configs/fourdfy_stage_1.yaml --train --gpu $gpu exp_root_dir=$exp_root_dir seed=$seed system.prompt_processor.prompt="a dog riding a skateboard"
 
 # Stage 2
 # ckpt=/path/to/fourdfy_stage_1/a_dog_riding_a_skateboard@timestamp/ckpts/last.ckpt
@@ -74,8 +90,7 @@ exp_root_dir=/path/to
 ```
 
 ## Memory Usage
-Depending on the text prompt, stage 3 might not fit on a 40/48 GB GPU, we trained our final models with an 80 GB GPU.
-There are ways to reduce memory usage to fit on smaller GPUs:
+We provide low_vram config files for 24/40/48 GB GPUs, as we originally trained on a 80 GB GPU. If you want to further reduce memory, you can try this:
 - VSD guidance can be disabled and multi-view guidance increased accordingly to compensate by setting data.single_view.prob_single_view_video=1.0 and data.prob_multi_view=0.75
 - Reducing the number of ray samples with system.renderer.num_samples_per_ray=256 or system.renderer.num_samples_per_ray=128
 - Another way is to reduce the rendering resolution for the video model with data.single_view.width_vid=144 and data.single_view.height_vid=80 (or even data.single_view.width_vid=72 and data.single_view.height_vid=40)
