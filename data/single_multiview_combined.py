@@ -14,11 +14,11 @@ from threestudio.utils.config import parse_structured
 from threestudio.utils.typing import *
 from torch.utils.data import DataLoader, Dataset, IterableDataset
 
-from .random_multiview import (
+from .uncond_multiview_time import (
     RandomMultiviewCameraDataModuleConfig,
     RandomMultiviewCameraIterableDataset,
 )
-from .uncond import (
+from .uncond_time import (
     RandomCameraDataModuleConfig,
     RandomCameraDataset,
     RandomCameraIterableDataset,

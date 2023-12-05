@@ -23,14 +23,14 @@ from torch.utils.data import DataLoader, Dataset, IterableDataset
 
 @dataclass
 class RandomCameraDataModuleConfig:
-    # height and width should be Union[int, List[int]]
+    # height, width, and batch_size should be Union[int, List[int]]
     # but OmegaConf does not support Union of containers
     height: Any = 64
     width: Any = 64
+    batch_size: Any = 1
     resolution_milestones: List[int] = field(default_factory=lambda: [])
     eval_height: int = 512
     eval_width: int = 512
-    batch_size: int = 1
     eval_batch_size: int = 1
     n_val_views: int = 1
     n_test_views: int = 120
@@ -51,6 +51,10 @@ class RandomCameraDataModuleConfig:
     eval_fovy_deg: float = 70.0
     light_sample_strategy: str = "dreamfusion"
     batch_uniform_azimuth: bool = True
+    progressive_until: int = 0  # progressive ranges for elevation, azimuth, r, fovy
+
+    rays_d_normalize: bool = True
+
     # Dynamic
     static: bool = True
     num_frames: int = 1
@@ -65,6 +69,8 @@ class RandomCameraDataModuleConfig:
     num_test_loop_factor: int = 1
     num_test_loop_static: int = 4
     test_traj: Optional[str] = None
+
+    update_from_json: bool = True
 
 
 class RandomCameraIterableDataset(IterableDataset, Updateable):
@@ -82,12 +88,6 @@ class RandomCameraIterableDataset(IterableDataset, Updateable):
             if isinstance(self.cfg.batch_size, int)
             else self.cfg.batch_size
         )
-        if (
-            len(self.heights) != 1
-            and len(self.widths) != 1
-            and len(self.batch_sizes) == 1
-        ):
-            self.batch_sizes = self.batch_sizes * len(self.heights)
         assert len(self.heights) == len(self.widths) == len(self.batch_sizes)
         self.resolution_milestones: List[int]
         if (
@@ -147,11 +147,36 @@ class RandomCameraIterableDataset(IterableDataset, Updateable):
         self.width = self.widths[size_ind]
         self.batch_size = self.batch_sizes[size_ind]
         self.directions_unit_focal = self.directions_unit_focals[size_ind]
-        threestudio.debug(f"Training height: {self.height}, width: {self.width}")
+        threestudio.debug(
+            f"Training height: {self.height}, width: {self.width}, batch_size: {self.batch_size}"
+        )
+        # progressive view
+        self.progressive_view(global_step)
 
     def __iter__(self):
         while True:
             yield {}
+
+    def progressive_view(self, global_step):
+        r = min(1.0, global_step / (self.cfg.progressive_until + 1))
+        self.elevation_range = [
+            (1 - r) * self.cfg.eval_elevation_deg + r * self.cfg.elevation_range[0],
+            (1 - r) * self.cfg.eval_elevation_deg + r * self.cfg.elevation_range[1],
+        ]
+        self.azimuth_range = [
+            (1 - r) * 0.0 + r * self.cfg.azimuth_range[0],
+            (1 - r) * 0.0 + r * self.cfg.azimuth_range[1],
+        ]
+        # self.camera_distance_range = [
+        #     (1 - r) * self.cfg.eval_camera_distance
+        #     + r * self.cfg.camera_distance_range[0],
+        #     (1 - r) * self.cfg.eval_camera_distance
+        #     + r * self.cfg.camera_distance_range[1],
+        # ]
+        # self.fovy_range = [
+        #     (1 - r) * self.cfg.eval_fovy_deg + r * self.cfg.fovy_range[0],
+        #     (1 - r) * self.cfg.eval_fovy_deg + r * self.cfg.fovy_range[1],
+        # ]
 
     def collate(self, batch) -> Dict[str, Any]:
         # Simultaneous training
@@ -196,18 +221,19 @@ class RandomCameraIterableDataset(IterableDataset, Updateable):
         else:
             # otherwise sample uniformly on sphere
             elevation_range_percent = [
-                (self.cfg.elevation_range[0] + 90.0) / 180.0,
-                (self.cfg.elevation_range[1] + 90.0) / 180.0,
+                self.elevation_range[0] / 180.0 * math.pi,
+                self.elevation_range[1] / 180.0 * math.pi,
             ]
             # inverse transform sampling
             elevation = torch.asin(
-                2
-                * (
+                (
                     torch.rand(self.batch_size).repeat(batch_factor)
-                    * (elevation_range_percent[1] - elevation_range_percent[0])
-                    + elevation_range_percent[0]
+                    * (
+                        math.sin(elevation_range_percent[1])
+                        - math.sin(elevation_range_percent[0])
+                    )
+                    + math.sin(elevation_range_percent[0])
                 )
-                - 1.0
             )
             elevation_deg = elevation / math.pi * 180.0
         if train_dynamic_camera:
@@ -226,16 +252,16 @@ class RandomCameraIterableDataset(IterableDataset, Updateable):
             azimuth_deg = (
                 torch.rand(self.batch_size) + torch.arange(self.batch_size)
             ) / self.batch_size * (
-                self.cfg.azimuth_range[1] - self.cfg.azimuth_range[0]
-            ) + self.cfg.azimuth_range[
+                self.azimuth_range[1] - self.azimuth_range[0]
+            ) + self.azimuth_range[
                 0
             ]
         else:
             # simple random sampling
             azimuth_deg = (
                 torch.rand(self.batch_size).repeat(batch_factor)
-                * (self.cfg.azimuth_range[1] - self.cfg.azimuth_range[0])
-                + self.cfg.azimuth_range[0]
+                * (self.azimuth_range[1] - self.azimuth_range[0])
+                + self.azimuth_range[0]
             )
         azimuth = azimuth_deg * math.pi / 180
         if train_dynamic_camera:
@@ -250,8 +276,8 @@ class RandomCameraIterableDataset(IterableDataset, Updateable):
         # sample distances from a uniform distribution bounded by distance_range
         camera_distances: Float[Tensor, "B"] = (
             torch.rand(self.batch_size).repeat(batch_factor)
-            * (self.cfg.camera_distance_range[1] - self.cfg.camera_distance_range[0])
-            + self.cfg.camera_distance_range[0]
+            * (self.camera_distance_range[1] - self.camera_distance_range[0])
+            + self.camera_distance_range[0]
         )
         if train_dynamic_camera:
             camera_distance_range_delta = self.camera_distance_range_delta(
@@ -302,9 +328,8 @@ class RandomCameraIterableDataset(IterableDataset, Updateable):
 
         # sample fovs from a uniform distribution bounded by fov_range
         fovy_deg: Float[Tensor, "B"] = (
-            torch.rand(self.batch_size)
-            * (self.cfg.fovy_range[1] - self.cfg.fovy_range[0])
-            + self.cfg.fovy_range[0]
+            torch.rand(self.batch_size) * (self.fovy_range[1] - self.fovy_range[0])
+            + self.fovy_range[0]
         ).repeat(batch_factor)
         fovy = fovy_deg * math.pi / 180
 
@@ -389,10 +414,11 @@ class RandomCameraIterableDataset(IterableDataset, Updateable):
         )
 
         # Importance note: the returned rays_d MUST be normalized!
-        rays_o, rays_d = get_rays(directions, c2w, keepdim=True)
-
+        rays_o, rays_d = get_rays(
+            directions, c2w, keepdim=True, normalize=self.cfg.rays_d_normalize
+        )
         proj_mtx: Float[Tensor, "B 4 4"] = get_projection_matrix(
-            fovy, width / height, 0.1, 1000.0
+            fovy, width / height, 0.01, 100.0
         )  # FIXME: hard-coded near and far
         mvp_mtx: Float[Tensor, "B 4 4"] = get_mvp_matrix(c2w, proj_mtx)
 
@@ -416,6 +442,8 @@ class RandomCameraIterableDataset(IterableDataset, Updateable):
             "camera_distances": camera_distances,
             "height": height,
             "width": width,
+            "fovy": fovy,
+            "proj_mtx": proj_mtx,
             "frame_times": frame_times,
             "frame_times_video": frame_times,
             "is_video": is_video,
@@ -548,11 +576,24 @@ class RandomCameraDataset(Dataset):
             directions[:, :, :, :2] / focal_length[:, None, None, None]
         )
 
-        rays_o, rays_d = get_rays(directions, c2w, keepdim=True)
+        rays_o, rays_d = get_rays(
+            directions, c2w, keepdim=True, normalize=self.cfg.rays_d_normalize
+        )
         proj_mtx: Float[Tensor, "B 4 4"] = get_projection_matrix(
-            fovy, self.cfg.eval_width / self.cfg.eval_height, 0.1, 1000.0
+            fovy, self.cfg.eval_width / self.cfg.eval_height, 0.01, 100.0
         )  # FIXME: hard-coded near and far
         mvp_mtx: Float[Tensor, "B 4 4"] = get_mvp_matrix(c2w, proj_mtx)
+
+        self.rays_o, self.rays_d = rays_o, rays_d
+        self.mvp_mtx = mvp_mtx
+        self.c2w = c2w
+        self.camera_positions = camera_positions
+        self.light_positions = light_positions
+        self.elevation, self.azimuth = elevation, azimuth
+        self.elevation_deg, self.azimuth_deg = elevation_deg, azimuth_deg
+        self.camera_distances = camera_distances
+        self.fovy = fovy
+        self.proj_mtx = proj_mtx
 
         if self.cfg.test_traj in ["motion_smooth", "motion_smooth_full"]:
             frame_times = torch.linspace(0, 1.0, num_frames)
@@ -567,14 +608,6 @@ class RandomCameraDataset(Dataset):
             )
             frame_times = frame_times[: self.n_views]
         frame_times_video = torch.linspace(0, 1.0, num_frames)
-        self.rays_o, self.rays_d = rays_o, rays_d
-        self.mvp_mtx = mvp_mtx
-        self.c2w = c2w
-        self.camera_positions = camera_positions
-        self.light_positions = light_positions
-        self.elevation, self.azimuth = elevation, azimuth
-        self.elevation_deg, self.azimuth_deg = elevation_deg, azimuth_deg
-        self.camera_distances = camera_distances
         self.frame_times = frame_times
         self.frame_times_video = frame_times_video
 
@@ -593,6 +626,10 @@ class RandomCameraDataset(Dataset):
             "elevation": self.elevation_deg[index],
             "azimuth": self.azimuth_deg[index],
             "camera_distances": self.camera_distances[index],
+            "height": self.cfg.eval_height,
+            "width": self.cfg.eval_width,
+            "fovy": self.fovy[index],
+            "proj_mtx": self.proj_mtx[index],
             "frame_times": self.frame_times[[index]],
             "frame_times_video": self.frame_times_video,
             "train_dynamic_camera": False,
