@@ -65,7 +65,7 @@ class RandomSingleMultiViewCameraIterableDataset(IterableDataset, Updateable):
         return batch
 
 
-@register("single-multiview-combined-camera-datamodule")
+@register("4dfy-single-multiview-combined-camera-datamodule")
 class SingleMultiviewCombinedCameraDataModule(pl.LightningDataModule):
     cfg: RandomMultiviewCameraDataModuleConfig
 

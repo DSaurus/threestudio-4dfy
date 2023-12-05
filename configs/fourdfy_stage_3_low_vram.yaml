@@ -3,7 +3,7 @@ tag: "${rmspace:${system.prompt_processor.prompt},_}"
 exp_root_dir: "outputs"
 seed: 0
 
-data_type: "single-multiview-combined-camera-datamodule"
+data_type: "4dfy-single-multiview-combined-camera-datamodule"
 data:
   prob_multi_view: 0.5
   single_view:
@@ -59,7 +59,7 @@ system:
   prob_multi_view: ${data.prob_multi_view}
   prob_single_view_video: ${data.single_view.prob_single_view_video}
   stage: coarse
-  geometry_type: "implicit-volume"
+  geometry_type: "4dfy-implicit-volume"
   geometry:
     radius: 1.0
     normal_type: "finite_difference"
@@ -126,10 +126,8 @@ system:
     guidance_scale: 7.5
     min_step_percent: 0.02
     max_step_percent: 0.5
-    max_step_percent_annealed: 0.5
-    anneal_start_step: 5000
 
-  guidance_type_multi_view: "multiview-diffusion-guidance"
+  guidance_type_multi_view: "mvdream-multiview-diffusion-guidance"
   guidance_multi_view:
     model_name: "sd-v2.1-base-4view"
     ckpt_path: null # path to a pre-downloaded checkpoint file (null for loading from URL)
@@ -146,7 +144,7 @@ system:
     prompt: ???
     spawn: False
 
-  guidance_type_video: "zeroscope-guidance"
+  guidance_type_video: "4dfy-zeroscope-guidance"
   guidance_video:
     pretrained_model_name_or_path: "cerspense/zeroscope_v2_576w"
     guidance_scale: 100.

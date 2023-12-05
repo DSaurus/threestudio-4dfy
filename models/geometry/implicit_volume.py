@@ -16,7 +16,7 @@ from threestudio.utils.typing import *
 from ..networks import get_encoding, get_mlp
 
 
-@threestudio.register("implicit-volume")
+@threestudio.register("4dfy-implicit-volume")
 class ImplicitVolume(BaseImplicitGeometry):
     @dataclass
     class Config(BaseImplicitGeometry.Config):

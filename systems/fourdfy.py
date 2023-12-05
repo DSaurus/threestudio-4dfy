@@ -180,13 +180,16 @@ class Fourdfy(BaseLift3DSystem):
                     for guidance_inp_i in guidance_inp.split(batch_size)
                 ]
                 guidance_out = {
-                    k: torch.zeros_like(v) for k, v in guidance_out_list[0].items()
+                    k: torch.zeros_like(v) if torch.is_tensor(v) else v
+                    for k, v in guidance_out_list[0].items()
                 }
                 for guidance_out_i in guidance_out_list:
                     for k, v in guidance_out.items():
-                        guidance_out[k] = v + guidance_out_i[k]
+                        if torch.is_tensor(v):
+                            guidance_out[k] = v + guidance_out_i[k]
                 for k, v in guidance_out.items():
-                    guidance_out[k] = v / len(guidance_out_list)
+                    if torch.is_tensor(v):
+                        guidance_out[k] = v / len(guidance_out_list)
             else:
                 guidance_out = guidance(
                     guidance_inp, prompt_utils, **batch, rgb_as_latents=False
