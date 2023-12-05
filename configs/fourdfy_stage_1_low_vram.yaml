@@ -101,7 +101,7 @@ system:
     guidance_scale: 7.5
     min_step_percent: 0.02
     max_step_percent: 0.5
-    
+
   guidance_type_multi_view: "mvdream-multiview-diffusion-guidance"
   guidance_multi_view:
     model_name: "sd-v2.1-base-4view"
