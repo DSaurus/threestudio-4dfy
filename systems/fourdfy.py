@@ -4,10 +4,9 @@ from dataclasses import dataclass, field
 import numpy as np
 import threestudio
 import torch
+from threestudio.systems.base import BaseLift3DSystem
 from threestudio.utils.ops import binary_cross_entropy, dot
 from threestudio.utils.typing import *
-
-from .base import BaseLift3DSystem
 
 
 @threestudio.register("fourdfy-system")
@@ -296,40 +295,49 @@ class Fourdfy(BaseLift3DSystem):
             batch_video = {k: v for k, v in batch.items() if k != "frame_times"}
             batch_video["frame_times"] = batch["frame_times_video"]
             out_video = self(batch_video)
-            self.save_image_grid(
-                f"it{self.true_global_step}-{batch['index'][0]}_video.png",
-                (
-                    [
+            for index in range(out_video["comp_rgb"].shape[0]):
+                self.save_image_grid(
+                    f"it{self.true_global_step}/{index}.png",
+                    (
+                        [
+                            {
+                                "type": "rgb",
+                                "img": out_video["comp_rgb"][index],
+                                "kwargs": {"data_format": "HWC"},
+                            },
+                        ]
+                        if "comp_rgb" in out_video
+                        else []
+                    )
+                    + (
+                        [
+                            {
+                                "type": "rgb",
+                                "img": out_video["comp_normal"][index],
+                                "kwargs": {"data_format": "HWC", "data_range": (0, 1)},
+                            }
+                        ]
+                        if "comp_normal" in out_video
+                        else []
+                    )
+                    + [
                         {
-                            "type": "rgb",
-                            "img": out_video["comp_rgb"],
-                            "kwargs": {"data_format": "HWC"},
+                            "type": "grayscale",
+                            "img": out_video["opacity"][index, :, :, 0],
+                            "kwargs": {"cmap": None, "data_range": (0, 1)},
                         },
-                    ]
-                    if "comp_rgb" in out_video
-                    else []
+                    ],
+                    name="validation_step",
+                    step=self.true_global_step,
                 )
-                + (
-                    [
-                        {
-                            "type": "rgb",
-                            "img": out_video["comp_normal"],
-                            "kwargs": {"data_format": "HWC", "data_range": (0, 1)},
-                        }
-                    ]
-                    if "comp_normal" in out_video
-                    else []
-                )
-                + [
-                    {
-                        "type": "grayscale",
-                        "img": out_video["opacity"],
-                        "kwargs": {"cmap": None, "data_range": (0, 1)},
-                    },
-                ],
-                name="validation_step",
+            self.save_img_sequence(
+                f"it{self.true_global_step}",
+                f"it{self.true_global_step}",
+                "(\d+)\.png",
+                save_format="mp4",
+                fps=15,
+                name=f"test_static",
                 step=self.true_global_step,
-                video=True,
             )
 
         if self.cfg.visualize_samples:
@@ -454,10 +462,10 @@ class Fourdfy(BaseLift3DSystem):
             )
         out_depths = np.stack(self.out_depths)
         non_zeros_depth = out_depths[out_depths != 0]
-        self.visu_perc_min_depth = np.percentile(
+        visu_perc_min_depth = np.percentile(
             non_zeros_depth, self.cfg.eval_depth_range_perc[0]
         )
-        self.visu_perc_max_depth = np.percentile(
+        visu_perc_max_depth = np.percentile(
             non_zeros_depth, self.cfg.eval_depth_range_perc[1]
         )
         depth_color_maps = ["jet"]
@@ -471,7 +479,10 @@ class Fourdfy(BaseLift3DSystem):
                             "img": depth,
                             "kwargs": {
                                 "cmap": depth_color_map,
-                                "data_range": "nonzero",
+                                "data_range": (
+                                    visu_perc_min_depth,
+                                    visu_perc_max_depth,
+                                ),
                             },
                         },
                     ],

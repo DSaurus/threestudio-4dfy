@@ -13,7 +13,7 @@ from threestudio.models.geometry.base import (
 from threestudio.utils.ops import get_activation
 from threestudio.utils.typing import *
 
-from ..networks import get_encoding, get_mlp
+from .networks import get_encoding, get_mlp
 
 
 @threestudio.register("4dfy-implicit-volume")
