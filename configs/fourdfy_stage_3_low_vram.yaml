@@ -138,7 +138,7 @@ system:
     recon_std_rescale: 0.5
 
 
-  prompt_processor_type_video: "zeroscope-prompt-processor"
+  prompt_processor_type_video: "4dfy-zeroscope-prompt-processor"
   prompt_processor_video:
     pretrained_model_name_or_path: "cerspense/zeroscope_v2_576w"
     prompt: ???
