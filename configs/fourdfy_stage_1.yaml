@@ -71,10 +71,11 @@ system:
     n_output_dims: 3
     color_activation: sigmoid
 
-  background_type: "neural-environment-map-background"
+  background_type: "mvdream-neural-environment-map-background"
   background:
     color_activation: sigmoid
     random_aug: true
+    share_aug: true
 
   renderer_type: "nerf-volume-renderer"
   renderer:
