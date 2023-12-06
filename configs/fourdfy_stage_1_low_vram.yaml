@@ -47,7 +47,7 @@ system_type: "fourdfy-system"
 system:
   prob_multi_view: ${data.prob_multi_view}
   stage: coarse
-  geometry_type: "4dfy-implicit-volume"
+  geometry_type: "implicit-volume"
   geometry:
     radius: 1.0
     normal_type: "finite_difference"
