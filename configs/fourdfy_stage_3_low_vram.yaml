@@ -149,7 +149,7 @@ system:
     pretrained_model_name_or_path: "cerspense/zeroscope_v2_576w"
     guidance_scale: 100.
     weighting_strategy: sds
-    low_ram_vae: true
+    low_ram_vae: 4
 
   loggers:
     wandb:

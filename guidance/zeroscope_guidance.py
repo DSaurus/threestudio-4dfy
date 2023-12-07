@@ -43,7 +43,7 @@ class ZeroscopeGuidance(BaseObject):
 
         view_dependent_prompting: bool = True
 
-        low_ram_vae: bool = False
+        low_ram_vae: int = -1
 
     cfg: Config
 
