@@ -641,7 +641,7 @@ class RandomCameraDataset(Dataset):
         return batch
 
 
-@register("random-camera-datamodule")
+@register("4dfy-random-camera-datamodule")
 class RandomCameraDataModule(pl.LightningDataModule):
     cfg: RandomCameraDataModuleConfig
 
