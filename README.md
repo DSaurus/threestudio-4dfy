@@ -4,6 +4,8 @@
 
 This is 4D-fy extension of threestudio. The original implementation can be found at https://github.com/sherwinbahmani/4dfy. We thank them for their contribution to the 3D generation community. To use it, please install [threestudio](https://github.com/threestudio-project/threestudio) and [threestudio-mvdream](https://github.com/DSaurus/threestudio-mvdream) extension first, and then install this extension in `custom` directory. If you want to run 4D-fy with a 24 GB GPU, you need additionally install [threestudio-stable-nerf-renderer](https://github.com/DSaurus/threestudio-stable-nerf-renderer) extension.
 
+**Note!!! Currently running under low VRAM in 3rd stage may result in decreased performance and we are working on it.**
+
 ## Installation
 
 ```
