@@ -1,4 +1,8 @@
 # 4D-fy threestudio extension
+<img src="https://github.com/DSaurus/threestudio-4dfy/assets/24589363/390d55ae-8e8d-4e06-9da6-6aebb98c431d" width="" height="200">
+<img src="https://github.com/DSaurus/threestudio-4dfy/assets/24589363/9e9983a2-c5e4-4717-be4a-c22f92d8852c" width="" height="200">
+<img src="https://github.com/DSaurus/threestudio-4dfy/assets/24589363/7031fe93-0b62-4d18-bc36-b3cfe4611c12" width="" height="200">
+<img src="https://github.com/DSaurus/threestudio-4dfy/assets/24589363/13dd8eb8-105f-4fe9-95ad-fc2cae45e64e" width="" height="200">
 
 | [Project Page](https://sherwinbahmani.github.io/4dfy/) | [Paper](https://arxiv.org/abs/2311.17984) | [User Study Template](https://github.com/victor-rong/video-generation-study) |
 
