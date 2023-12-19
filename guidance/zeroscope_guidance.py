@@ -1,5 +1,7 @@
+import inspect
 from dataclasses import dataclass, field
 
+import numpy as np
 import threestudio
 import torch
 import torch.nn as nn
@@ -10,21 +12,21 @@ from threestudio.models.prompt_processors.base import PromptProcessorOutput
 from threestudio.utils.base import BaseObject
 from threestudio.utils.misc import C, cleanup, parse_version
 from threestudio.utils.typing import *
+from tqdm import tqdm
+from transformers import CLIPTextModel, CLIPTokenizer
 
 
-@threestudio.register("stable-diffusion-guidance")
-class StableDiffusionGuidance(BaseObject):
+@threestudio.register("4dfy-zeroscope-guidance")
+class ZeroscopeGuidance(BaseObject):
     @dataclass
     class Config(BaseObject.Config):
-        pretrained_model_name_or_path: str = "runwayml/stable-diffusion-v1-5"
+        pretrained_model_name_or_path: str = None
         enable_memory_efficient_attention: bool = False
         enable_sequential_cpu_offload: bool = False
         enable_attention_slicing: bool = False
         enable_channels_last_format: bool = False
         guidance_scale: float = 100.0
-        grad_clip: Optional[
-            Any
-        ] = None  # field(default_factory=lambda: [0, 2.0, 8.0, 1000])
+        grad_clip: Optional[Any] = None
         half_precision_weights: bool = True
 
         min_step_percent: float = 0.02
@@ -40,6 +42,8 @@ class StableDiffusionGuidance(BaseObject):
         token_merging_params: Optional[dict] = field(default_factory=dict)
 
         view_dependent_prompting: bool = True
+
+        low_ram_vae: int = -1
 
     cfg: Config
 
@@ -62,6 +66,19 @@ class StableDiffusionGuidance(BaseObject):
             **pipe_kwargs,
         ).to(self.device)
 
+        # Extra modules
+        self.tokenizer = CLIPTokenizer.from_pretrained(
+            self.cfg.pretrained_model_name_or_path,
+            subfolder="tokenizer",
+            torch_dtype=self.weights_dtype,
+        )
+        self.text_encoder = CLIPTextModel.from_pretrained(
+            self.cfg.pretrained_model_name_or_path,
+            subfolder="text_encoder",
+            torch_dtype=self.weights_dtype,
+        )
+        self.text_encoder = self.text_encoder.to(self.device)
+
         if self.cfg.enable_memory_efficient_attention:
             if parse_version(torch.__version__) >= parse_version("2"):
                 threestudio.info(
@@ -83,7 +100,7 @@ class StableDiffusionGuidance(BaseObject):
         if self.cfg.enable_channels_last_format:
             self.pipe.unet.to(memory_format=torch.channels_last)
 
-        del self.pipe.text_encoder
+        # del self.pipe.text_encoder
         cleanup()
 
         # Create model
@@ -130,6 +147,9 @@ class StableDiffusionGuidance(BaseObject):
 
         self.grad_clip_val: Optional[float] = None
 
+        # Extra for latents
+        self.vae_scale_factor = 2 ** (len(self.vae.config.block_out_channels) - 1)
+
         threestudio.info(f"Loaded Stable Diffusion!")
 
     @torch.cuda.amp.autocast(enabled=False)
@@ -148,29 +168,97 @@ class StableDiffusionGuidance(BaseObject):
 
     @torch.cuda.amp.autocast(enabled=False)
     def encode_images(
-        self, imgs: Float[Tensor, "B 3 512 512"]
-    ) -> Float[Tensor, "B 4 64 64"]:
+        self, imgs: Float[Tensor, "B 3 N 320 576"], normalize: bool = True
+    ) -> Float[Tensor, "B 4 40 72"]:
+        # breakpoint()
+        if len(imgs.shape) == 4:
+            print("Only given an image an not video")
+            imgs = imgs[:, :, None]
+        # breakpoint()
+        batch_size, channels, num_frames, height, width = imgs.shape
+        imgs = imgs.permute(0, 2, 1, 3, 4).reshape(
+            batch_size * num_frames, channels, height, width
+        )
         input_dtype = imgs.dtype
-        imgs = imgs * 2.0 - 1.0
-        posterior = self.vae.encode(imgs.to(self.weights_dtype)).latent_dist
-        latents = posterior.sample() * self.vae.config.scaling_factor
+        if normalize:
+            imgs = imgs * 2.0 - 1.0
+        # breakpoint()
+
+        if self.cfg.low_ram_vae > 0:
+            vnum = self.cfg.low_ram_vae
+            mask_vae = torch.randperm(imgs.shape[0]) < vnum
+            with torch.no_grad():
+                posterior_mask = torch.cat(
+                    [
+                        self.vae.encode(
+                            imgs[~mask_vae][i : i + 1].to(self.weights_dtype)
+                        ).latent_dist.sample()
+                        for i in range(imgs.shape[0] - vnum)
+                    ],
+                    dim=0,
+                )
+            posterior = torch.cat(
+                [
+                    self.vae.encode(
+                        imgs[mask_vae][i : i + 1].to(self.weights_dtype)
+                    ).latent_dist.sample()
+                    for i in range(vnum)
+                ],
+                dim=0,
+            )
+            posterior_full = torch.zeros(
+                imgs.shape[0],
+                *posterior.shape[1:],
+                device=posterior.device,
+                dtype=posterior.dtype,
+            )
+            posterior_full[~mask_vae] = posterior_mask
+            posterior_full[mask_vae] = posterior
+            latents = posterior_full * self.vae.config.scaling_factor
+        else:
+            posterior = self.vae.encode(imgs.to(self.weights_dtype)).latent_dist
+            latents = posterior.sample() * self.vae.config.scaling_factor
+
+        latents = (
+            latents[None, :]
+            .reshape(
+                (
+                    batch_size,
+                    num_frames,
+                    -1,
+                )
+                + latents.shape[2:]
+            )
+            .permute(0, 2, 1, 3, 4)
+        )
         return latents.to(input_dtype)
 
     @torch.cuda.amp.autocast(enabled=False)
-    def decode_latents(
-        self,
-        latents: Float[Tensor, "B 4 H W"],
-        latent_height: int = 64,
-        latent_width: int = 64,
-    ) -> Float[Tensor, "B 3 512 512"]:
-        input_dtype = latents.dtype
-        latents = F.interpolate(
-            latents, (latent_height, latent_width), mode="bilinear", align_corners=False
-        )
+    def decode_latents(self, latents):
+        # TODO: Make decoding align with previous version
         latents = 1 / self.vae.config.scaling_factor * latents
-        image = self.vae.decode(latents.to(self.weights_dtype)).sample
-        image = (image * 0.5 + 0.5).clamp(0, 1)
-        return image.to(input_dtype)
+
+        batch_size, channels, num_frames, height, width = latents.shape
+        latents = latents.permute(0, 2, 1, 3, 4).reshape(
+            batch_size * num_frames, channels, height, width
+        )
+
+        image = self.vae.decode(latents).sample
+        video = (
+            image[None, :]
+            .reshape(
+                (
+                    batch_size,
+                    num_frames,
+                    -1,
+                )
+                + image.shape[2:]
+            )
+            .permute(0, 2, 1, 3, 4)
+        )
+        # we always cast to float32 as this does not cause significant overhead and is compatible with bfloat16
+        video = video.float()
+        return video
 
     def compute_grad_sds(
         self,
@@ -183,7 +271,6 @@ class StableDiffusionGuidance(BaseObject):
             # add noise
             noise = torch.randn_like(latents)  # TODO: use torch generator
             latents_noisy = self.scheduler.add_noise(latents, noise, t)
-            # pred noise
             latent_model_input = torch.cat([latents_noisy] * 2, dim=0)
             noise_pred = self.forward_unet(
                 latent_model_input,
@@ -259,28 +346,30 @@ class StableDiffusionGuidance(BaseObject):
         elevation: Float[Tensor, "B"],
         azimuth: Float[Tensor, "B"],
         camera_distances: Float[Tensor, "B"],
-        rgb_as_latents=False,
+        rgb_as_latents: bool = False,
+        num_frames: int = 16,
         **kwargs,
     ):
-        batch_size = rgb.shape[0]
-
         rgb_BCHW = rgb.permute(0, 3, 1, 2)
-        latents: Float[Tensor, "B 4 64 64"]
+        batch_size = rgb_BCHW.shape[0] // num_frames
+        latents: Float[Tensor, "B 4 40 72"]
+        if kwargs["train_dynamic_camera"]:
+            elevation = elevation[[0]]
+            azimuth = azimuth[[0]]
+            camera_distances = camera_distances[[0]]
         if rgb_as_latents:
             latents = F.interpolate(
-                rgb_BCHW, (64, 64), mode="bilinear", align_corners=False
+                rgb_BCHW, (40, 72), mode="bilinear", align_corners=False
             )
         else:
             rgb_BCHW_512 = F.interpolate(
-                rgb_BCHW, (512, 512), mode="bilinear", align_corners=False
+                rgb_BCHW, (320, 576), mode="bilinear", align_corners=False
             )
-            # encode image into latents with vae
+            rgb_BCHW_512 = rgb_BCHW_512.permute(1, 0, 2, 3)[None]
             latents = self.encode_images(rgb_BCHW_512)
-
         text_embeddings = prompt_utils.get_text_embeddings(
             elevation, azimuth, camera_distances, self.cfg.view_dependent_prompting
         )
-
         # timestep ~ U(0.02, 0.98) to avoid very high/low noise level
         t = torch.randint(
             self.min_step,
@@ -289,12 +378,10 @@ class StableDiffusionGuidance(BaseObject):
             dtype=torch.long,
             device=self.device,
         )
-
         if self.cfg.use_sjc:
             grad = self.compute_grad_sjc(latents, text_embeddings, t)
         else:
             grad = self.compute_grad_sds(latents, text_embeddings, t)
-
         grad = torch.nan_to_num(grad)
         # clip grad for stable training?
         if self.grad_clip_val is not None:
@@ -304,10 +391,10 @@ class StableDiffusionGuidance(BaseObject):
         # SpecifyGradient is not straghtforward, use a reparameterization trick instead
         target = (latents - grad).detach()
         # d(loss)/d(latents) = latents - target = latents - (latents - grad) = grad
-        loss_sds = 0.5 * F.mse_loss(latents, target, reduction="sum") / batch_size
 
+        loss_sds = 0.5 * F.mse_loss(latents, target, reduction="sum") / batch_size
         return {
-            "loss_sds": loss_sds,
+            "loss_sds_video": loss_sds,
             "grad_norm": grad.norm(),
         }
 

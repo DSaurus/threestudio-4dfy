@@ -21,7 +21,7 @@ from threestudio.utils.ops import (
 from threestudio.utils.typing import *
 from torch.utils.data import DataLoader, Dataset, IterableDataset
 
-from .uncond import (
+from .uncond_time import (
     RandomCameraDataModuleConfig,
     RandomCameraDataset,
     RandomCameraIterableDataset,
@@ -33,6 +33,8 @@ class RandomMultiviewCameraDataModuleConfig(RandomCameraDataModuleConfig):
     relative_radius: bool = True
     n_view: int = 1
     zoom_range: Tuple[float, float] = (1.0, 1.0)
+
+    rays_d_normalize: bool = True
 
 
 class RandomMultiviewCameraIterableDataset(RandomCameraIterableDataset):
@@ -234,7 +236,9 @@ class RandomMultiviewCameraIterableDataset(RandomCameraIterableDataset):
         )
 
         # Importance note: the returned rays_d MUST be normalized!
-        rays_o, rays_d = get_rays(directions, c2w, keepdim=True)
+        rays_o, rays_d = get_rays(
+            directions, c2w, keepdim=True, normalize=self.cfg.rays_d_normalize
+        )
 
         proj_mtx: Float[Tensor, "B 4 4"] = get_projection_matrix(
             fovy, self.width / self.height, 0.1, 1000.0
@@ -263,13 +267,13 @@ class RandomMultiviewCameraIterableDataset(RandomCameraIterableDataset):
             "camera_distances": camera_distances,
             "height": self.height,
             "width": self.width,
-            "fovy": fovy_deg,
+            "fovy": fovy,
             "frame_times": frame_times,
             "train_dynamic_camera": False,
         }
 
 
-@register("random-multiview-camera-datamodule")
+@register("4dfy-random-multiview-camera-datamodule")
 class RandomMultiviewCameraDataModule(pl.LightningDataModule):
     cfg: RandomMultiviewCameraDataModuleConfig
 

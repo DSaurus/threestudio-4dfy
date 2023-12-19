@@ -1,55 +1,23 @@
-# 4D-fy - threestudio
+# 4D-fy threestudio extension
+<img src="https://github.com/DSaurus/threestudio-4dfy/assets/24589363/390d55ae-8e8d-4e06-9da6-6aebb98c431d" width="" height="200">
+<img src="https://github.com/DSaurus/threestudio-4dfy/assets/24589363/9e9983a2-c5e4-4717-be4a-c22f92d8852c" width="" height="200">
+<img src="https://github.com/DSaurus/threestudio-4dfy/assets/24589363/7031fe93-0b62-4d18-bc36-b3cfe4611c12" width="" height="200">
+<img src="https://github.com/DSaurus/threestudio-4dfy/assets/24589363/13dd8eb8-105f-4fe9-95ad-fc2cae45e64e" width="" height="200">
 
 | [Project Page](https://sherwinbahmani.github.io/4dfy/) | [Paper](https://arxiv.org/abs/2311.17984) | [User Study Template](https://github.com/victor-rong/video-generation-study) |
 
-- **This code is forked from [threestudio](https://github.com/threestudio-project/threestudio).**
+This is 4D-fy extension of threestudio. The original implementation can be found at https://github.com/sherwinbahmani/4dfy. We thank them for their contribution to the 3D generation community. To use it, please install [threestudio](https://github.com/threestudio-project/threestudio) and [threestudio-mvdream](https://github.com/DSaurus/threestudio-mvdream) extension first, and then install this extension in `custom` directory. If you want to run 4D-fy with a 24 GB GPU, you need additionally install [threestudio-stable-nerf-renderer](https://github.com/DSaurus/threestudio-stable-nerf-renderer) extension.
+
+**Note!!! Currently running under low VRAM in 3rd stage may result in decreased performance and we are working on it.**
 
 ## Installation
 
-### Install threestudio
-
-**This part is the same as original threestudio. Skip it if you already have installed the environment.**
-
-- You must have an NVIDIA graphics card with at least 24GB VRAM and have [CUDA](https://developer.nvidia.com/cuda-downloads) installed.
-- Install `Python >= 3.8`.
-- (Optional, Recommended) Create a virtual environment:
-
-```sh
-python3 -m virtualenv venv
-. venv/bin/activate
-
-# Newer pip versions, e.g. pip-23.x, can be much faster than old versions, e.g. pip-20.x.
-# For instance, it caches the wheels of git packages to avoid unnecessarily rebuilding them later.
-python3 -m pip install --upgrade pip
 ```
+cd custom
+git clone https://github.com/DSaurus/threestudio-4dfy
 
-- Install `PyTorch >= 1.12`. We have tested on `torch1.12.1+cu113` and `torch2.0.0+cu118`, but other versions should also work fine.
-
-```sh
-# torch1.12.1+cu113
-pip install torch==1.12.1+cu113 torchvision==0.13.1+cu113 --extra-index-url https://download.pytorch.org/whl/cu113
-# or torch2.0.0+cu118
-pip install torch torchvision --index-url https://download.pytorch.org/whl/cu118
-```
-
-- (Optional, Recommended) Install ninja to speed up the compilation of CUDA extensions:
-
-```sh
-pip install ninja
-```
-
-- Install dependencies:
-
-```sh
-pip install -r requirements.txt
-```
-
-### Install MVDream
-MVDream multi-view diffusion model is provided in a different codebase. Install it by:
-
-```sh
-git clone https://github.com/bytedance/MVDream extern/MVDream
-pip install -e extern/MVDream
+# If you have a 24/40/48 GB GPU, please install additional stable-nerf-renderer extension
+git clone https://github.com/DSaurus/threestudio-stable-nerf-renderer
 ```
 
 ## Quickstart
@@ -64,29 +32,29 @@ exp_root_dir=/path/to
 # If you have a 24/40/48 GB GPU, you can use the low_vram config files:
 
 # Stage 1
-# python launch.py --config configs/fourdfy_stage_1_low_vram.yaml --train --gpu $gpu exp_root_dir=$exp_root_dir seed=$seed system.prompt_processor.prompt="a dog riding a skateboard"
+# python launch.py --config custom/threestudio-4dfy/configs/fourdfy_stage_1_low_vram.yaml --train --gpu $gpu exp_root_dir=$exp_root_dir seed=$seed system.prompt_processor.prompt="a dog riding a skateboard"
 
 # Stage 2
 # ckpt=/path/to/fourdfy_stage_1/a_dog_riding_a_skateboard@timestamp/ckpts/last.ckpt
-# python launch.py --config configs/fourdfy_stage_2_low_vram.yaml --train --gpu $gpu exp_root_dir=$exp_root_dir seed=$seed system.prompt_processor.prompt="a dog riding a skateboard" system.weights=$ckpt
+# python launch.py --config custom/threestudio-4dfy/configs/fourdfy_stage_2_low_vram.yaml --train --gpu $gpu exp_root_dir=$exp_root_dir seed=$seed system.prompt_processor.prompt="a dog riding a skateboard" system.weights=$ckpt
 
 # Stage 3
 # ckpt=/path/to/fourdfy_stage_2/a_dog_riding_a_skateboard@timestamp/ckpts/last.ckpt
-# python launch.py --config configs/fourdfy_stage_3_low_vram.yaml --train --gpu $gpu exp_root_dir=$exp_root_dir seed=$seed system.prompt_processor.prompt="a dog riding a skateboard" system.weights=$ckpt
+# python launch.py --config custom/threestudio-4dfy/configs/fourdfy_stage_3_low_vram.yaml --train --gpu $gpu exp_root_dir=$exp_root_dir seed=$seed system.prompt_processor.prompt="a dog riding a skateboard" system.weights=$ckpt
 
 
 # If you have a 80 GB GPU, you can use the original config files:
 
 # Stage 1
-# python launch.py --config configs/fourdfy_stage_1.yaml --train --gpu $gpu exp_root_dir=$exp_root_dir seed=$seed system.prompt_processor.prompt="a dog riding a skateboard"
+# python launch.py --config custom/threestudio-4dfy/configs/fourdfy_stage_1.yaml --train --gpu $gpu exp_root_dir=$exp_root_dir seed=$seed system.prompt_processor.prompt="a dog riding a skateboard"
 
 # Stage 2
 # ckpt=/path/to/fourdfy_stage_1/a_dog_riding_a_skateboard@timestamp/ckpts/last.ckpt
-# python launch.py --config configs/fourdfy_stage_2.yaml --train --gpu $gpu exp_root_dir=$exp_root_dir seed=$seed system.prompt_processor.prompt="a dog riding a skateboard" system.weights=$ckpt
+# python launch.py --config custom/threestudio-4dfy/configs/fourdfy_stage_2.yaml --train --gpu $gpu exp_root_dir=$exp_root_dir seed=$seed system.prompt_processor.prompt="a dog riding a skateboard" system.weights=$ckpt
 
 # Stage 3
 # ckpt=/path/to/fourdfy_stage_2/a_dog_riding_a_skateboard@timestamp/ckpts/last.ckpt
-# python launch.py --config configs/fourdfy_stage_3.yaml --train --gpu $gpu exp_root_dir=$exp_root_dir seed=$seed system.prompt_processor.prompt="a dog riding a skateboard" system.weights=$ckpt
+# python launch.py --config custom/threestudio-4dfy/configs/fourdfy_stage_3.yaml --train --gpu $gpu exp_root_dir=$exp_root_dir seed=$seed system.prompt_processor.prompt="a dog riding a skateboard" system.weights=$ckpt
 ```
 
 ## Memory Usage

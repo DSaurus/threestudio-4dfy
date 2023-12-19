@@ -3,7 +3,7 @@ tag: "${rmspace:${system.prompt_processor.prompt},_}"
 exp_root_dir: "outputs"
 seed: 0
 
-data_type: "single-multiview-combined-camera-datamodule"
+data_type: "4dfy-single-multiview-combined-camera-datamodule"
 data:
   prob_multi_view: 0.5
   single_view:
@@ -90,10 +90,11 @@ system:
     n_output_dims: 3
     color_activation: sigmoid
 
-  background_type: "neural-environment-map-background"
+  background_type: "mvdream-neural-environment-map-background"
   background:
     color_activation: sigmoid
     random_aug: true
+    share_aug: true
 
   renderer_type: "nerf-volume-renderer"
   renderer:
@@ -123,10 +124,8 @@ system:
     guidance_scale: 7.5
     min_step_percent: 0.02
     max_step_percent: 0.5
-    max_step_percent_annealed: 0.5
-    anneal_start_step: 5000
 
-  guidance_type_multi_view: "multiview-diffusion-guidance"
+  guidance_type_multi_view: "mvdream-multiview-diffusion-guidance"
   guidance_multi_view:
     model_name: "sd-v2.1-base-4view"
     ckpt_path: null # path to a pre-downloaded checkpoint file (null for loading from URL)
@@ -136,12 +135,12 @@ system:
     recon_loss: true
     recon_std_rescale: 0.5
 
-  prompt_processor_type_video: "zeroscope-prompt-processor"
+  prompt_processor_type_video: "4dfy-zeroscope-prompt-processor"
   prompt_processor_video:
     pretrained_model_name_or_path: "cerspense/zeroscope_v2_576w"
     prompt: ???
 
-  guidance_type_video: "zeroscope-guidance"
+  guidance_type_video: "4dfy-zeroscope-guidance"
   guidance_video:
     pretrained_model_name_or_path: "cerspense/zeroscope_v2_576w"
     guidance_scale: 100.
@@ -178,7 +177,7 @@ system:
         lr: 0.001
       background:
         lr: 0.001
-      guidance:
+      guidance_single_view:
         lr: 0.0001
 
 trainer:
