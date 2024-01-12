@@ -8,11 +8,11 @@ import torch.nn as nn
 from threestudio.models.prompt_processors.base import PromptProcessor, hash_prompt
 from threestudio.utils.misc import cleanup
 from threestudio.utils.typing import *
-from transformers import AutoTokenizer, CLIPTextModel
+from transformers import CLIPTextModel, CLIPTokenizer
 
 
-@threestudio.register("stable-diffusion-prompt-processor")
-class StableDiffusionPromptProcessor(PromptProcessor):
+@threestudio.register("4dfy-zeroscope-prompt-processor")
+class ZeroscopePromptProcessor(PromptProcessor):
     @dataclass
     class Config(PromptProcessor.Config):
         pass
@@ -21,7 +21,7 @@ class StableDiffusionPromptProcessor(PromptProcessor):
 
     ### these functions are unused, kept for debugging ###
     def configure_text_encoder(self) -> None:
-        self.tokenizer = AutoTokenizer.from_pretrained(
+        self.tokenizer = CLIPTokenizer.from_pretrained(
             self.cfg.pretrained_model_name_or_path, subfolder="tokenizer"
         )
         os.environ["TOKENIZERS_PARALLELISM"] = "false"
@@ -71,7 +71,7 @@ class StableDiffusionPromptProcessor(PromptProcessor):
     @staticmethod
     def spawn_func(pretrained_model_name_or_path, prompts, cache_dir):
         os.environ["TOKENIZERS_PARALLELISM"] = "false"
-        tokenizer = AutoTokenizer.from_pretrained(
+        tokenizer = CLIPTokenizer.from_pretrained(
             pretrained_model_name_or_path, subfolder="tokenizer"
         )
         text_encoder = CLIPTextModel.from_pretrained(
@@ -79,7 +79,6 @@ class StableDiffusionPromptProcessor(PromptProcessor):
             subfolder="text_encoder",
             device_map="auto",
         )
-
         with torch.no_grad():
             tokens = tokenizer(
                 prompts,

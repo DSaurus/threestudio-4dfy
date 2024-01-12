@@ -14,11 +14,11 @@ from threestudio.utils.config import parse_structured
 from threestudio.utils.typing import *
 from torch.utils.data import DataLoader, Dataset, IterableDataset
 
-from .random_multiview import (
+from .uncond_multiview_time import (
     RandomMultiviewCameraDataModuleConfig,
     RandomMultiviewCameraIterableDataset,
 )
-from .uncond import (
+from .uncond_time import (
     RandomCameraDataModuleConfig,
     RandomCameraDataset,
     RandomCameraIterableDataset,
@@ -65,7 +65,7 @@ class RandomSingleMultiViewCameraIterableDataset(IterableDataset, Updateable):
         return batch
 
 
-@register("single-multiview-combined-camera-datamodule")
+@register("4dfy-single-multiview-combined-camera-datamodule")
 class SingleMultiviewCombinedCameraDataModule(pl.LightningDataModule):
     cfg: RandomMultiviewCameraDataModuleConfig
 
